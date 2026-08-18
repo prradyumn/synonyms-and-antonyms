@@ -1,0 +1,9 @@
+{
+  "name": "word-tree",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Synonym game for Grade 1-2 English learners. Monty, Jhumru and Tez.",
+  "scripts": {
+    "start": "npx --yes serve . -l 5510"
+  }
+}
