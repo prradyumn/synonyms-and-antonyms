@@ -1,0 +1,10 @@
+# Build inputs and reference material. The site loads only the derived assets in
+# assets/bg, assets/chars/*.webp and assets/audio -- these are the originals that
+# tools/build-assets.py reads, plus docs and prototypes. Keeping them in git but
+# out of the deployment takes it from ~45MB to ~6MB.
+assets/source/
+assets/chars/*.gif
+tools/
+docs/
+prototypes/
+.vscode/
