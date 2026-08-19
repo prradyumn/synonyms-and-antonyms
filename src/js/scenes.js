@@ -134,6 +134,13 @@ function mkActor(modes,defKey,rider){
  /* how far the rear wheel sits from the box centre, in px. The ramp needs this:
     his position along the slope is where the WHEEL is, not where the box is. */
  o.wheelDX=()=>{const b=o.base,bCW=U(b.hu)*b.ar;return (b.ax-0.5)*bCW};
+ /* A point on the sprite box, given as fractions of it, expressed as percentages
+    of the FRAME -- which is what transform-origin on #stage wants. The handlebar
+    grip measured off the sprite is (0.77, 0.56). */
+ o.at=(fx,fy)=>{
+  const r=w.getBoundingClientRect(),f=F.getBoundingClientRect();
+  return [100*(r.x-f.x+fx*r.width)/f.width, 100*(r.y-f.y+fy*r.height)/f.height];
+ };
  o.show=k=>{const m=o.modes[k];if(!m||m===o.m)return;
   o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.layout()};
  o.layout=()=>{
@@ -312,12 +319,32 @@ function hook(){
  const say=(lines,t0)=>{
   lines.forEach((l,i)=>later(()=>{
    ask(l.line,l.who,l.face);
-   if(l.fx==='bell')play('bell');
+   if(l.fx==='bell')bellBeat();
    if(l.fx==='map')trailMap();
    if(l.fx==='ask')askToCome();
   },t0+i*LINE));
   return Math.max(LINE,lines.length*LINE);
  };
+ /* "Tring! Tring!" -- the one place the camera goes in close on a detail rather
+    than on him. He is stopped, the line is about the bicycle, and the bell is a
+    14px object on a 1476px frame: without the push there is nothing to look at, and
+    the SFX has to carry the whole beat on its own.
+
+    1.22 is a shade past the 1.15 used at the bridge, which is affordable here
+    because it is brief and the plate behind him is 1920 native. Origin is the
+    handlebar itself, so the grip stays put and the world grows around it. */
+ function bellBeat(){
+  play('bell');
+  if(!J)return;
+  const [ox,oy]=J.at(0.77,0.56);
+  camTo(1.22,600,ox,oy);
+  const b=svg(bellSVG());J.w.appendChild(b);
+  later(()=>{if(b.parentNode)b.remove()},1050);       /* 2 x 430ms, plus a tail */
+  /* Out well before he pedals off. The bank stop runs 3 x LINE and the bell is its
+     last line, so releasing at LINE-800 lands the ease 150ms clear of the ride --
+     no scale left moving once the parallax starts. */
+  later(()=>camTo(1,650),LINE-800);
+ }
  /* the jungle trail map, popped up in front of him */
  function trailMap(){
   const m=el('<img class="trailmap" src="'+A.map+'">');

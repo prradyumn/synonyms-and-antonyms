@@ -56,6 +56,39 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
    0.70) never stretches them; bottom-anchored so the feet stay on the ground. */
 .cyc img{display:block;position:relative;z-index:1;width:100%;height:100%;object-fit:contain;object-position:50% 100%;transform-origin:50% 50%}
 
+/* ---- bicycle bell ----
+   The supplied animation, retimed. It shipped as an infinite 1.9s loop; the bell
+   SFX is two rings 430ms apart (build_audio cuts one recording into two), so this
+   runs at 430ms with exactly two iterations and the picture lands on the sound.
+
+   It lives INSIDE .cyc, positioned as a fraction of the sprite box, so it travels
+   with him and scales with the camera without any code. drop-shadow because teal
+   on sky or foliage has almost no separation on its own. */
+/* Sized so the bell body lands ~14px across and the ripples sweep ~75px ahead of
+   it. Geometry: the body sits at cx=34 of a 340-wide viewBox, so it is 10% in from
+   the SVG's left -- left/top back that offset out to put the body ON the grip,
+   measured off the sprite at (0.77, 0.56). */
+.bell{position:absolute;left:71.4%;top:49.8%;width:56%;height:auto;z-index:3;
+ pointer-events:none;filter:drop-shadow(0 calc(1 * var(--u)) calc(3 * var(--u)) rgba(6,32,24,.45))}
+@keyframes bellClang{
+ 0%{transform:scale(.45,.5);opacity:0}
+ 6%{opacity:.95}
+ 55%{opacity:.2}
+ 100%{transform:scale(9.6,1.78);opacity:0}}
+@keyframes bellStrike{
+ 0%{transform:scale(1)}
+ 5%{transform:scale(1.18)}
+ 16%{transform:scale(.96)}
+ 32%{transform:scale(1.03)}
+ 60%,100%{transform:scale(1)}}
+.bell .ring{transform-origin:0 0;animation:bellClang var(--bell,430ms) cubic-bezier(.15,.75,.3,1) 2 both}
+.bell .ring:nth-child(2){animation-delay:.055s}
+.bell .ring:nth-child(3){animation-delay:.11s}
+.bell .ring:nth-child(4){animation-delay:.165s}
+.bell .body{transform-origin:40px 50px;animation:bellStrike var(--bell,430ms) cubic-bezier(.15,.75,.3,1) 2 both}
+@media (prefers-reduced-motion:reduce){
+ .bell .ring,.bell .body{animation:none}
+ .bell .ring{opacity:.35}}
 .cycsh{position:absolute;left:13%;bottom:-1%;width:74%;height:9%;border-radius:50%;background:radial-gradient(closest-side,rgba(34,22,8,.5),rgba(34,22,8,.2),rgba(34,22,8,0))}
 .vine{position:absolute;left:0;right:0;bottom:calc(244 * var(--u));height:calc(48 * var(--u));z-index:5;pointer-events:none}
 .ramp{position:absolute;z-index:2;pointer-events:none}
