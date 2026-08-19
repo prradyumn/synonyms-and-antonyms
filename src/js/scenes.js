@@ -141,7 +141,7 @@ function title(){
  const rig=pxBuild(0);
  RELAY=()=>rig.layout();
  F.appendChild(el('<div class="over card"><h3>Word Tree</h3>'
-  +'<p>Monty, Jhumru and Tez are walking to the Word Tree.<br>Somebody always needs another word.</p>'
+  +'<p>Jhumru is riding out to the Word Tree.<br>Somebody always needs another word.</p>'
   +'<button class="btn">Play</button></div>'));
  F.querySelector('.btn').onclick=()=>{audioStart();hook()};
  $('#asktxt').textContent='Tap Play to begin.';   /* set, not spoken -- no gesture yet */
@@ -156,10 +156,14 @@ function title(){
    Camera stops are fractions of travel: 0, .5, 1. Tap anywhere to skip. */
 /* Travel was reading as rushed. LEG is the slowest lever -- it is how long a
    full screen of world takes to pass. */
-const RIDE_IN=1500,LEG=4200,JOIN=1000,SETTLE=800,LINE=1550;
+/* PACE is the one knob for how fast the opening runs. Everything below is a base
+   figure multiplied by it, so raising PACE slows the bicycle, the camera, how long
+   each line stays and how long the map holds, all together and in proportion. */
+const PACE=1.45;
+const RIDE_IN=1500*PACE, LEG=4200*PACE, SETTLE=800*PACE, LINE=1550*PACE;
 /* how long the trail map stays up, and the fade off it */
-const MAP_LIFE=2600,MAP_FADE=420;
-const HOLD_X=42,MONTY_X=58;
+const MAP_LIFE=2600*PACE,MAP_FADE=420;
+const HOLD_X=42;
 /* The three walkable surfaces, measured off the art. GROUND1 is the top of the
    ochre PATH in act_bank -- measuring topmost-opaque instead finds the bushes
    standing BEHIND the path and leaves him floating ~32px above it. */
@@ -179,7 +183,11 @@ const GROUND1=77.5,DECK=65.3,GROUND3=86;
    ended 2.4% of frame width before that, leaving its cut right face showing
    against the background, which is what read as pasted on. 0.755 tucks it ~3%
    under, and the segment paints over the overlap. */
-const RAMP_A_RISE=GROUND1-DECK, RAMP_A_TIP=0.755;
+/* Crest and rise come from the layout editor: the climb ramp was nudged DOWN so
+   it beds into the bank and the deck instead of sitting flush on both. Its crest
+   is therefore 0.53% below the plank surface and its base 0.56% below the path --
+   both under 6px, which the u<=0 / u>=1 clamps absorb without a visible step. */
+const RAMP_A_CREST=65.83, RAMP_A_RISE=12.22, RAMP_A_TIP=0.755;
 const RAMP_B_RISE=10.5,          RAMP_B_TIP=0.30;   /* fraction along leg B */
 /* The plate is 5:2, which is a 21.8-degree slope -- steep for something a small
    character cycles up. Stretched horizontally it reads as a gentler built ramp,
@@ -288,7 +296,7 @@ function hook(){
     listener comes off -- the choice IS the interaction at this point. */
  function askToCome(){
   foff();
-  const c=el('<div class="over card"><h3>Will you come?</h3>'
+  const c=el('<div class="over card ask"><h3>Will you come?</h3>'
    +'<button class="btn">Yes!</button></div>');
   F.appendChild(c);
   c.querySelector('.btn').onclick=e=>{
@@ -300,23 +308,19 @@ function hook(){
 
  function roll(){
   const rig=pxBuild(0);
-  chip('tur','left:90.7%;bottom:'+(100-GROUND3)+'%',rig.act).classList.add('px');
   /* Both ramps are built up front. They are part of the world, so they must not
      pop into existence when their leg starts. The climb ramp goes BEHIND the
      bridge segment so the deck covers where it meets it; the take-off ramp on the
      deck stays in front. */
-  const rA=putRamp(rig,RAMP_A_TIP*.5,DECK,RAMP_A_RISE,rig.segs[1]);
+  const rA=putRamp(rig,RAMP_A_TIP*.5,RAMP_A_CREST,RAMP_A_RISE,rig.segs[1]);
   const rB=putRamp(rig,.5+RAMP_B_TIP*.5,DECK-RAMP_B_RISE,RAMP_B_RISE);
-  /* 0.70 is the WALK aspect: his box must fit his widest sprite */
+  /* his box fits his widest sprite -- the wheelie canvas */
   /* 322 = 215 * 1.5. Monty stays 185, so the elephant now reads 1.74x the monkey.
      For 1.5x the MONKEY instead, this is 278. Feet are unaffected either way --
      place() anchors on the ground line, not the top of the sprite. */
   const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
-  const M=mkActor({idle:{url:IDLE.mon,hu:185,ar:0.70,ax:0.5},
-                   walk:{url:WALK.mon,hu:185,ar:0.70,ax:0.5}},'idle');
-  M.w.dataset.name='monty';
-  J.place(-14,GROUND1);M.place(118,GROUND3,-1);   /* waits off the right edge */
-  RELAY=()=>{rig.layout();J.layout();M.layout()};
+  J.place(-14,GROUND1);
+  RELAY=()=>{rig.layout();J.layout()};
 
   let t=0;
   /* ---- stop 1: the near bank ---- */
@@ -362,17 +366,9 @@ function hook(){
    },()=>{J.img.style.transform=''});  },t);
   t+=LEG;
 
-  /* ---- stop 3: the clearing, and Monty arrives from the right ---- */
+  /* ---- stop 3: the clearing. He turns to the player. ---- */
   later(()=>{J.show('still');J.riding(0);tone(430,.12)},t);
   t+=SETTLE;
-  later(()=>{
-   tone(560,.12);M.show('walk');
-   /* walk cycle faces right, so scaleX(-1) to come leftward off the right edge */
-   const si=every(()=>play('step'),360);   /* 8-frame cycle is 720ms -> 2 steps */
-   tween(JOIN,p=>M.place(118+(MONTY_X-118)*easeOut(p),GROUND3,-1),
-         ()=>{M.show('idle');cancel(si)});
-  },t);
-  t+=JOIN;
   say(HOOK.clearing,t);   /* ends on 'Will you come?' -- askToCome() takes over */
  }
 }
@@ -386,8 +382,6 @@ function intro(){
  const rig=pxBuild(1),bt='bottom:'+(100-GROUND3)+'%';
  RELAY=()=>rig.layout();
  chip('ele','left:'+HOLD_X+'%;'+bt).classList.add('px');
- chip('mon','left:'+MONTY_X+'%;'+bt).classList.add('px');
- chip('tur','left:90.7%;'+bt,rig.act).classList.add('px');
  /* the script already said 'Let us go', so this is just the instruction */
  ask('The trail starts here. More of it soon.','nar');
 }

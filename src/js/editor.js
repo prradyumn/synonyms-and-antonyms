@@ -344,19 +344,31 @@ function collect() {
   };
 }
 function cssText() {
-  let out = '/* screen: ' + CONFIG.screenName() + ' - only what you moved.\n' +
-            '   Numbers are design units, so they go in as calc(N * var(--u)). */\n';
+  const s = scale();
+  let out = '/* screen: ' + CONFIG.screenName() + ' - only what you moved.' + '\n'
+          + '   Numbers are design units: calc(N * var(--u)).' + '\n'
+          + '   left/top are PARENT-relative, so they paste back as-is. */' + '\n';
   for (const { el } of targets()) {
     if (!edited.has(el)) continue;
-    const b = stageBox(el);
-    out += keyFor(el) + ' {\n' +
-      '  left:   calc(' + Math.round(b.x) + ' * var(--u));\n' +
-      '  top:    calc(' + Math.round(b.y) + ' * var(--u));\n' +
-      '  width:  calc(' + Math.round(b.w) + ' * var(--u));\n' +
-      '  height: calc(' + Math.round(b.h) + ' * var(--u));\n}\n';
+    const bx = stageBox(el);
+    /* Read left/top back off the inline style rather than using the stage x.
+       Emitting stage coords was wrong for anything inside the scrolling act
+       layer -- the value cannot be converted back without the camera offset,
+       which is exactly the case for the ramps. */
+    const lx = Math.round((parseFloat(el.style.left) || 0) / s);
+    const ty = Math.round((parseFloat(el.style.top) || 0) / s);
+    const c = el.classList.contains('ramp') ? rampCode(el, bx) : null;
+    if (c) out += '/* ' + c.which + ' -> ' + c.note + ':  TIP ' + c.RAMP_TIP
+                + '   RISE ' + c.RAMP_RISE + '   crest ' + c.crestPercent + '% */' + '\n';
+    out += keyFor(el) + ' {' + '\n'
+        + '  left:   calc(' + lx + ' * var(--u));' + '\n'
+        + '  top:    calc(' + ty + ' * var(--u));' + '\n'
+        + '  width:  calc(' + Math.round(bx.w) + ' * var(--u));' + '\n'
+        + '  height: calc(' + Math.round(bx.h) + ' * var(--u));' + '\n' + '}' + '\n';
   }
   return out;
 }
+
 function download(text, name, type) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type }));

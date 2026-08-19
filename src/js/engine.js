@@ -3,7 +3,7 @@
 
 const $=s=>document.querySelector(s),F=$('#frame'),BG=$('#bg'),BG2=$('#bg2'),FX=$('#fx'),AIR=$('#air');
 
-[...Object.values(A),...Object.values(IDLE),...Object.values(WALK)].forEach(u=>{const i=new Image();i.src=u});
+[...Object.values(A),...Object.values(IDLE)].forEach(u=>{const i=new Image();i.src=u});
 
 let GEN=0,T=[];
 
@@ -64,8 +64,7 @@ function tone(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContex
    user gesture, so nothing plays until the first pointerdown or keydown. */
 const SND={};
 let muted=false,audioOn=false;
-[['bgm','jungle_loop.mp3',.065,1],['bike','bike_loop.ogg',.17,1],['step','step.ogg',.26,0],
- ['bell','bell.ogg',.34,0]]
+[['bgm','jungle_loop.mp3',.065,1],['bike','bike_loop.ogg',.17,1],['bell','bell.ogg',.34,0]]
  .forEach(([k,f,v,loop])=>{const a=new Audio('assets/audio/'+f);
   a.volume=v;a.loop=!!loop;a.preload='auto';SND[k]=a});
 function audioLive(on){const m=$('#mute');if(m)m.classList.toggle('q',!on)}

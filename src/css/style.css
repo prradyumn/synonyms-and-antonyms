@@ -66,7 +66,10 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 @keyframes mapaway{from{opacity:1;transform:translate(-50%,-50%) scale(1)}
  to{opacity:0;transform:translate(-50%,-56%) scale(.85)}}
 .cyc.wheelie .cycsh{left:33%;width:16%;height:5%;bottom:-0.5%}
-/* .card is a centred panel rather than a full cover, so the scene stays visible */
+/* .card is a centred panel rather than a full cover, so the scene stays visible.
+   .ask sits off to the right because the question comes while Jhumru is stood
+   at 42% -- centred, it covered his face. */
+.over.card.ask{left:70%}
 .over.card{inset:auto;left:50%;top:52%;transform:translate(-50%,-50%);width:auto;max-width:64%;
  border-radius:calc(34 * var(--u));box-shadow:0 calc(12 * var(--u)) 0 rgba(0,0,0,.16)}
 .over{position:absolute;inset:0;background:rgba(255,253,245,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(28 * var(--u));text-align:center;padding:calc(57 * var(--u));z-index:12}

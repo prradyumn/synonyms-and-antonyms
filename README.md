@@ -117,11 +117,18 @@ waiting. Nothing breaks. **Tap anywhere to skip.**
 
 | beat | what happens |
 |---|---|
-| bank | he rides in and introduces himself |
-| leg A | the camera travels; he rides up onto the bridge |
-| bridge | he stops **alone** midspan and says what he is doing |
-| leg B | he rides on; the camera travels to the clearing |
-| clearing | he settles, then **Monty walks in from the right** to meet him |
+| bank | he rides in and introduces himself, and rings the bell |
+| leg A | the camera travels; he rides the ramp up onto the bridge |
+| bridge | he stops midspan; the trail map pops up |
+| leg B | he rides on over the take-off ramp |
+| clearing | he stops and turns to the player — the opening waits for a Yes |
+
+**Jhumru is the only character.** Monty and Tez are out of the game, along with
+their sprites, the walk cycle and the footstep sound.
+
+**Pacing is one knob.** `PACE` in `scenes.js` multiplies every base timing —
+ride-in, camera travel, how long each line stays, how long the map holds — so
+they stay in proportion. At `1.45` the question lands around 30s.
 
 ~17s end to end, skippable by tapping. The pauses size themselves off `HOOK` in
 `levels.js` — one entry per stop, so adding or cutting a line needs no code change.

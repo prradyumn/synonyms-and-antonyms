@@ -9,13 +9,10 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
          join_trunk:'assets/bg/join_trunk.webp',act_bank:'assets/bg/act_bank.webp',act_bridge:'assets/bg/act_bridge.webp',act_clearing:'assets/bg/act_clearing.webp',
          wlift:'assets/chars/wheelie_lift.webp',whold:'assets/chars/wheelie_hold.webp',wland:'assets/chars/wheelie_land.webp',
          cyc:'assets/chars/jhumru_cycle.webp',cycs:'assets/chars/jhumru_cycle_still.webp',
-         ele:'assets/chars/jhumru.webp',mon:'assets/chars/monty.webp',tur:'assets/chars/tez.webp'};
+         ele:'assets/chars/jhumru.webp'};
 
-/* Idle breathing loops, used wherever a character just stands there.
-   Tez has no loop drawn yet, so chip() falls back to the still for him. */
-const IDLE={mon:'assets/chars/monty_idle.webp',ele:'assets/chars/jhumru_idle.webp'};
-/* Walk cycles, for characters actually travelling. Faces right at rest. */
-const WALK={mon:'assets/chars/monty_walk.webp'};
+/* Idle breathing loop, used wherever Jhumru just stands there. */
+const IDLE={ele:'assets/chars/jhumru_idle.webp'};
 
 /* Jhumru's sprite modes. Every entry declares its own box aspect and its own
    rear-wheel anchor as a fraction of that box, because the wheelie frames sit on
