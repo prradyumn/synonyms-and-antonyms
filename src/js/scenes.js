@@ -42,7 +42,7 @@ function pxBuild(f0){
  rig.push({el:act,rate:1});
  PXFRONT.forEach(([k,rate,edge,h])=>rig.push({el:layer('pxf',6,
   edge+':0;background-image:url('+A[k]+')'),rate:rate,tile:1,strip:h}));
- rig.act=act;rig.f=f0||0;
+ rig.act=act;rig.segs=segs;rig.f=f0||0;
 
  rig.layout=()=>{
   const Fw=Math.round(F.clientWidth);
@@ -163,7 +163,8 @@ const HOLD_X=42,MONTY_X=58;
 /* The three walkable surfaces, measured off the art. GROUND1 is the top of the
    ochre PATH in act_bank -- measuring topmost-opaque instead finds the bushes
    standing BEHIND the path and leaves him floating ~32px above it. */
-const GROUND1=77.5,DECK=65.6,GROUND3=86;
+/* DECK is the plank surface of act_bridge, measured at 65.28% -- not eyeballed. */
+const GROUND1=77.5,DECK=65.3,GROUND3=86;
 /* Both legs carry a ramp and a wheelie.
 
    Leg A is the climb ONTO the bridge: the ramp rises the full bank-to-deck
@@ -173,7 +174,12 @@ const GROUND1=77.5,DECK=65.6,GROUND3=86;
    RAMP_*_RISE is the single source of truth for each -- it sets both the crest in
    the rider's height and the ramp's drawn height, so the two cannot drift apart
    and leave him floating over the lip. */
-const RAMP_A_RISE=GROUND1-DECK, RAMP_A_TIP=0.70;   /* fraction along leg A */
+/* RAMP_A_TIP is set so the ramp's crest runs UNDER the deck rather than stopping
+   short of it. act_bridge's deck starts ~16% into its segment; at 0.70 the ramp
+   ended 2.4% of frame width before that, leaving its cut right face showing
+   against the background, which is what read as pasted on. 0.755 tucks it ~3%
+   under, and the segment paints over the overlap. */
+const RAMP_A_RISE=GROUND1-DECK, RAMP_A_TIP=0.755;
 const RAMP_B_RISE=10.5,          RAMP_B_TIP=0.30;   /* fraction along leg B */
 /* The plate is 5:2, which is a 21.8-degree slope -- steep for something a small
    character cycles up. Stretched horizontally it reads as a gentler built ramp,
@@ -197,20 +203,23 @@ function rampSurface(u){
 /* A ramp in the act layer, so it scrolls with the world. Its box IS the ramp:
    bottom edge on the surface below, top edge the crest. Returns the geometry the
    rider needs to walk its profile. */
-function putRamp(rig,tipCam,crestY,rise){
+function putRamp(rig,tipCam,crestY,rise,behind){
  const Fw=F.clientWidth,Fh=F.clientHeight;
  const rh=rise/100*Fh,rw=Math.round(rh*RAMP_AR*RAMP_STRETCH);
  const rp=el('<img class="ramp" src="'+A.ramp+'">');
  rp.style.cssText='position:absolute;width:'+rw+'px;height:'+Math.round(rh)+'px;'
   +'left:'+(tipCam*rig.span+HOLD_X/100*Fw-rw*0.94)+'px;'
   +'top:'+(crestY/100*Fh)+'px;z-index:2';
- rig.act.appendChild(rp);
+ /* `behind` slots the ramp before a segment so that segment paints OVER its
+    cut right edge -- otherwise the flat end of the plate sits on top of the
+    deck as a hard vertical line, which reads as pasted on. */
+ if(behind)rig.act.insertBefore(rp,behind);else rig.act.appendChild(rp);
  const left=tipCam*rig.span+HOLD_X/100*Fw-rw*0.94;
  const sh=el('<div class="rampsh"></div>');
  sh.style.cssText='position:absolute;z-index:1;left:'+(left+rw*0.03)+'px;'
   +'top:'+((crestY+rise)/100*Fh-rh*0.10)+'px;'
   +'width:'+Math.round(rw*0.96)+'px;height:'+Math.round(rh*0.20)+'px';
- rig.act.appendChild(sh);
+ if(behind)rig.act.insertBefore(sh,rp);else rig.act.appendChild(sh);
  /* his position along the ramp, 0 at the foot and 1 at the crest. It is placed so
     he is 94% along it at tipCam, which is where the crest sits. */
  const wCam=rw/rig.span;
@@ -290,6 +299,12 @@ function hook(){
  function roll(){
   const rig=pxBuild(0);
   chip('tur','left:90.7%;bottom:'+(100-GROUND3)+'%',rig.act).classList.add('px');
+  /* Both ramps are built up front. They are part of the world, so they must not
+     pop into existence when their leg starts. The climb ramp goes BEHIND the
+     bridge segment so the deck covers where it meets it; the take-off ramp on the
+     deck stays in front. */
+  const rA=putRamp(rig,RAMP_A_TIP*.5,DECK,RAMP_A_RISE,rig.segs[1]);
+  const rB=putRamp(rig,.5+RAMP_B_TIP*.5,DECK-RAMP_B_RISE,RAMP_B_RISE);
   /* 0.70 is the WALK aspect: his box must fit his widest sprite */
   /* 322 = 215 * 1.5. Monty stays 185, so the elephant now reads 1.74x the monkey.
      For 1.5x the MONKEY instead, this is 278. Feet are unaffected either way --
@@ -311,7 +326,6 @@ function hook(){
   later(()=>{
    say(HOOK.legA,0);                                 /* spoken as he pedals off */
    J.show('cyc');J.riding(1);
-   const rA=putRamp(rig,RAMP_A_TIP*.5,DECK,RAMP_A_RISE);   /* onto the bridge */
    const runA=wheelieRun(J,rA,c=>c/.5);
    tween(LEG,p=>{
     rig.setF(p*.5);
@@ -331,7 +345,6 @@ function hook(){
   /* ---- leg B: both travel on to the clearing ---- */
   later(()=>{
    J.show('cyc');J.riding(1);
-   const rB=putRamp(rig,.5+RAMP_B_TIP*.5,DECK-RAMP_B_RISE,RAMP_B_RISE);
    const runB=wheelieRun(J,rB,c=>(c-.5)/.5);
    const offP=(rB.crestCam-.5)/.5;                   /* leg fraction at the lip */
    tween(LEG,p=>{
