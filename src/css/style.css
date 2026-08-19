@@ -54,6 +54,8 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
    is sized -- which is the point: the body is ONE file, so it cannot drift
    between expressions the way seven flattened sprites did. */
 .cyc img.face{position:absolute;left:0;top:0;z-index:2}
+/* the outgoing expression, fading out over the incoming one */
+.cyc img.face.out{z-index:3}
 .cyc img.face[hidden]{display:none}
 .cycsh{position:absolute;left:13%;bottom:-1%;width:74%;height:9%;border-radius:50%;background:radial-gradient(closest-side,rgba(34,22,8,.5),rgba(34,22,8,.2),rgba(34,22,8,0))}
 .vine{position:absolute;left:0;right:0;bottom:calc(244 * var(--u));height:calc(48 * var(--u));z-index:5;pointer-events:none}

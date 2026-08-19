@@ -199,6 +199,12 @@ def build_wheelie():
 
 
 EXPR_SRC = 'assets/chars/expressions/full_frames'
+# Off until the pack is re-exported. The delivered frames carry a 12px feather
+# across the seam that cross-dissolves each new mouth into the original's open
+# one, leaving a ghosted smear over the jaw -- measurable in the raw art, where
+# every frame converges to the base over rows 274-280. Nothing here can undo a
+# blend that is already baked in. Flip this back on with the new export.
+EXPR_READY = False
 EXPR = ['still_proud', 'still_think', 'still_wow', 'still_ask',
         'still_cheer', 'still_confused', 'still_encourage']
 EXPR_SEAM = 280          # in the delivered 662x880 space; 140 at game resolution
@@ -239,6 +245,8 @@ def build_expressions():
     stays right if the pack is ever regenerated."""
     src = ROOT / EXPR_SRC
     base_p = CH / 'jhumru_cycle_still.webp'
+    if not EXPR_READY:
+        print('skip expressions (EXPR_READY is False -- pack needs re-export)'); return
     if not src.exists() or not base_p.exists():
         print('skip expressions (no pack)'); return
     base = Image.open(base_p).convert('RGBA')

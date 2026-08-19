@@ -14,26 +14,19 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
 /* Idle breathing loop, used wherever Jhumru just stands there. */
 const IDLE={ele:'assets/chars/jhumru_idle.webp'};
 
-/* Head-only overlays for the stopped bicycle. All 331x440 like the body, so they
-   need no placement of their own.
+/* PARKED -- expression overlays for the stopped bicycle. Empty on purpose.
 
-   One thing they cannot do: the delivered art's seam runs through the middle of
-   his open mouth, so the lower lip and tongue belong to the body and are shared
-   by every expression. Eyes, brows, ears and trunk carry all the difference --
-   which is most of what reads at this size anyway, and every line in the opening
-   is spoken, so an open mouth is right for all of them. `confused` and
-   `encourage` are the two that would rather be closed-mouthed; they are for
-   answer feedback, and are unused until the mechanic lands. */
-const FACES={
- neutral  :'assets/chars/face_neutral.webp',
- proud    :'assets/chars/face_proud.webp',
- think    :'assets/chars/face_think.webp',
- wow      :'assets/chars/face_wow.webp',
- ask      :'assets/chars/face_ask.webp',
- cheer    :'assets/chars/face_cheer.webp',
- confused :'assets/chars/face_confused.webp',
- encourage:'assets/chars/face_encourage.webp'
-};
+   The art is drawn and the poses are right, but it was exported with a 12px
+   feather across the seam, which cross-dissolves each new mouth into the
+   original's open mouth and leaves a ghosted horizontal smear over the jaw. It is
+   baked into the delivered pixels (the raw frames converge to the base over rows
+   274-280), so no compositing here can undo it. Waiting on a re-EXPORT, not a
+   redraw -- see docs/13-expression-frames.md.
+
+   The machinery below it stays live: mkActor().face(k) reads this map, so filling
+   it in is the only change needed when the frames land. Every HOOK line already
+   carries its face key. */
+const FACES={};
 
 /* Jhumru's sprite modes. Every entry declares its own box aspect and its own
    rear-wheel anchor as a fraction of that box, because the wheelie frames sit on
@@ -43,10 +36,7 @@ const FACES={
    paste them again if the frames are ever regenerated. */
 const RIDER={
  cyc  :{url:'assets/chars/jhumru_cycle.webp',      hu:322, ar:331/440, ax:0.290},
- /* `still` is the body ALONE -- headless. A face overlay always supplies the head,
-    so an expression can change without re-encoding the bike underneath it. show()
-    guarantees a face is present whenever this mode is on screen. */
- still:{url:'assets/chars/jhumru_cycle_body.webp',hu:322, ar:331/440, ax:0.290, face:1},
+ still:{url:'assets/chars/jhumru_cycle_still.webp',hu:322, ar:331/440, ax:0.290},
  lift :{url:'assets/chars/wheelie_lift.webp',      hu:314, ar:1.0886,  ax:0.409},
  hold :{url:'assets/chars/wheelie_hold.webp',      hu:314, ar:1.0886,  ax:0.409},
  land :{url:'assets/chars/wheelie_land.webp',      hu:314, ar:1.0886,  ax:0.409}

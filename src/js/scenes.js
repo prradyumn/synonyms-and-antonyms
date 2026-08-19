@@ -99,10 +99,14 @@ function yAt(track,p){
    sized for its widest sprite -- object-fit:contain would otherwise shrink a wide
    walk cycle to fit a box cut for the narrower idle. */
 function mkActor(modes,defKey,rider){
- const w=el('<div class="cyc"><div class="cycsh"></div><img><img class="face" hidden></div>');
+ /* Three layers: the body sprite, the face on it, and one spare face slot that the
+    outgoing expression fades out through. */
+ const w=el('<div class="cyc"><div class="cycsh"></div><img>'
+           +'<img class="face" hidden><img class="face out" hidden></div>');
  F.appendChild(w);
  const im=w.querySelectorAll('img');
- const o={w:w,img:im[0],fimg:im[1],fk:'neutral',x:0,y:0,f:1,modes:modes,base:modes[defKey]};
+ const o={w:w,img:im[0],f1:im[1],f2:im[2],fk:'neutral',x:0,y:0,f:1,
+          modes:modes,base:modes[defKey]};
  /* `rider` marks who the wheel loop belongs to */
  o.riding=on=>{w.classList.toggle('riding',!!on);
   if(rider){if(on)play('bike');else stopSnd('bike')}};
@@ -113,11 +117,27 @@ function mkActor(modes,defKey,rider){
  o.wheelDX=()=>{const b=o.base,bCW=U(b.hu)*b.ar;return (b.ax-0.5)*bCW};
  /* Which head he wears. Kept across mode changes, so a stop can set the
     expression once and the cycling and wheelie sprites -- which carry their own
-    heads -- just ignore it until he stops again. */
- o.face=k=>{if(k&&FACES[k])o.fk=k;o.dress()};
- /* Only the `still` mode is headless, and it is never drawn without this. */
+    heads -- just ignore it until he stops again.
+
+    Expressions CROSS-FADE rather than cut. A hard swap between two heads on an
+    otherwise motionless character is a pop the eye goes straight to; 220ms of
+    dissolve reads as him changing his mind. It runs on VT like everything else,
+    so it pauses with the game. */
+ o.face=k=>{
+  if(!k||!FACES[k]||k===o.fk)return;
+  const was=o.f1.getAttribute('src'),m=o.m||o.base;
+  o.fk=k;
+  if(!m.face||!was||o.f1.hidden){o.dress();return}   /* riding, or nothing shown yet */
+  o.f2.src=was;o.f2.hidden=false;o.f2.style.opacity='1';
+  o.f1.src=FACES[k];                                 /* the new head, underneath */
+  tween(220,p=>{o.f2.style.opacity=String(1-p)},
+        ()=>{o.f2.hidden=true;o.f2.removeAttribute('src')});
+ };
+ /* Only the `still` mode is headless, and it is never drawn without a face. */
  o.dress=()=>{const m=o.m||o.base;
-  if(m.face){o.fimg.src=FACES[o.fk];o.fimg.hidden=false}else o.fimg.hidden=true};
+  o.f2.hidden=true;
+  if(m.face&&FACES[o.fk]){o.f1.src=FACES[o.fk];o.f1.hidden=false}
+  else o.f1.hidden=true};
  o.show=k=>{const m=o.modes[k];if(!m||m===o.m)return;
   o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.dress();o.layout()};
  o.layout=()=>{
@@ -282,10 +302,10 @@ function hook(){
  fon('pointerdown',skip);
  const done=()=>intro();
 
- /* The faces go in here too: `still` is headless on its own, so a face arriving
-    late would show a body with no head for a frame. */
+ /* Faces are preloaded with everything else: a face arriving late would show a
+    frame of the wrong expression. Harmless while FACES is empty. */
  Promise.all(['far_sky','mid_canopy','act_bank','act_bridge','act_clearing','cyc','cycs']
-  .map(k=>A[k]).concat(RIDER.still.url,Object.values(FACES))
+  .map(k=>A[k]).concat(Object.values(FACES))
   .map(u=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=u})))
   .then(()=>{if(g===GEN)roll()});
 

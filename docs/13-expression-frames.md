@@ -6,47 +6,85 @@ actually ships.
 
 ---
 
-> ## ✅ Delivered and wired in
+> ## ⏸ Delivered, and parked pending a re-EXPORT
 >
-> The set arrived and is live in the opening. Source art is in
-> [assets/chars/expressions/](assets/chars/expressions/); `build_expressions()` in
-> [tools/build-assets.py](tools/build-assets.py) turns it into one headless body
-> plus eight head overlays in `assets/chars/`.
+> The art is right. The export is not, and it cannot be fixed downstream. Source
+> is in [assets/chars/expressions/](assets/chars/expressions/); the build step is
+> written and gated behind `EXPR_READY = False` in
+> [tools/build-assets.py](tools/build-assets.py).
 >
-> **The pack itself was exact.** 662×880, seam at 280, anchor 0.29, every frame
+> ### What was right
+>
+> Exactly to spec: 662×880, seam at 280, anchor 0.29, `hu:322`, every frame
 > byte-identical below the seam, rear-wheel contact at the same pixel in all
-> seven, and the base matched our own sprite with 0.0 delta. Two things came out
-> of checking it, and only one was the artist's:
+> seven, and their base matched our own sprite with **0.0 delta**. Poses,
+> palette, line weight and head scale are all good. Nothing needs redrawing.
 >
-> **1 · The seam runs through his mouth — my error, not theirs.** I picked y=140
-> by measuring which colours crossed that row and reported "flat grey and flat
-> white". I only ever tested the blue and white fractions; I never tested red. 70
-> of the 270 opaque pixels on that row are open mouth. So the lower lip and tongue
-> belong to the body layer and are **shared by all seven expressions** — the
-> closed-mouth instructions in prompts 2, 4 and 7 below were impossible to honour.
+> ### What is wrong — the feather
 >
-> It costs little in practice: every line in the opening is spoken, so an open
-> mouth is right for all five story beats. It does mean `confused` and
-> `encourage` can never be closed-mouthed. **A future round should put the seam at
-> y=162**, below the mouth and through the flat blue strap and flat white shirt —
-> just as reproducible, and it frees the mouth.
+> They applied the 12px seam feather their own JSON documents. That feather
+> **cross-dissolves each new mouth into the original's open mouth**, leaving a
+> pale ghosted smear across the jaw. Measured on the raw delivered PNGs,
+> `still_think` differs from their base by mean ~90 up to y=270 and then decays
+> 34.8 → 24.5 → 11.0 → **0.0** at y=280. It is baked into the pixels.
 >
-> **2 · The ears drifted in saturation.** Hue was spot on everywhere (within
-> 1.2°), but `wow`, `encourage` and `cheer` came back washed out and pink — up to
-> −0.19 saturation. The build corrects it by measuring each frame's warm pixels
-> against the approved still rather than by a typed-in number, so it stays right
-> if the pack is regenerated. Corrections applied: ×1.25, ×1.28, ×1.10.
+> It is visible at true game scale (he renders 248px tall) on all seven frames.
+> Only `neutral` is clean, and only because `neutral` *is* the original.
 >
-> **Head overlays, not flattened sprites.** Flattening each delivered frame into
-> its own full sprite re-encodes the body seven more times, and lossy WebP left
-> 0.3% of body pixels differing by >24/255 along the bike outlines — a shimmer on
-> a character standing still while his face changes. Lossless fixes it at 532KB;
-> stacking transparent heads over **one shared body file** is exact *and* smaller,
-> at 79KB. `RIDER.still` is now the headless body and `mkActor().face(k)` supplies
-> the head, held across mode changes so the cycling and wheelie sprites — which
-> carry their own heads — simply ignore it.
+> Three things were tried and none of them work:
 >
-> Expressions are driven from the script: each `HOOK` line takes a `face:` key.
+> - **Head overlay vs full-body sprite makes no difference.** The two composites
+>   differ by 6043 px in the *body* and only **182 px in the head** — the ghost is
+>   in the head either way. Whichever way it is assembled, the smear is there.
+> - **Cutting above the mouth** (y=118) removes the ghost cleanly and gives back
+>   the original's single open mouth — but the trunk then crosses the cut and ends
+>   in a flat horizontal blade. It trades one artefact for a worse one.
+> - **Un-feathering** is impossible: the un-dissolved head render was not
+>   delivered, only the blended composite.
+>
+> ### The ask — a re-export, not a redraw
+>
+> Send them this. It should be minutes of work if their project is still open:
+>
+> ```
+> The frames are right -- pose, colour and alignment are all correct, nothing
+> needs redrawing. Two changes to how they are EXPORTED:
+>
+> 1. NO feather at the seam. Deliver the head layer with a hard alpha edge. The
+>    12px feather blends each new mouth into the mouth of the frame underneath and
+>    leaves a ghosted band across the jaw.
+>
+> 2. Extend the head layer DOWN to y=340 on the 880-tall canvas -- past the mouth
+>    and the chin, into the flat blue strap and flat white shirt. It currently
+>    stops at y=280, which is the middle of his open mouth.
+>
+> So: the head render on its own, unblended, cut at y=340 with a hard edge.
+> Everything else exactly as delivered.
+> ```
+>
+> **The seam being in his mouth was my error, not theirs.** I picked y=140 by
+> measuring which colours crossed that row and reported "flat grey and flat
+> white" — but I only ever tested the blue and white fractions, never red. 70 of
+> the 270 opaque pixels on that row are open mouth. The corrected seam is
+> **y=170** at game resolution / **340** on the delivered canvas.
+>
+> ### Already in place for when it lands
+>
+> - `build_expressions()` — head-only overlays over one shared body file. 79KB for
+>   the set, against 207KB for flattened sprites and 532KB for lossless ones, and
+>   the body cannot drift between expressions because it is the same file.
+> - **Ear saturation correction.** Hue was spot on across the set (within 1.2°) but
+>   `wow`, `encourage` and `cheer` came back washed out — up to −0.19. Corrected by
+>   measuring each frame's warm pixels against the approved still rather than by a
+>   typed-in number, so it survives a re-export: ×1.25, ×1.28, ×1.10.
+> - `mkActor().face(k)` with a **220ms cross-fade** between expressions. A hard cut
+>   between two heads on an otherwise motionless character is a pop the eye goes
+>   straight to. Runs on `VT`, so it pauses with the game.
+> - Every `HOOK` line already carries its `face:` key.
+>
+> Filling in `FACES` in [src/js/levels.js](src/js/levels.js), pointing
+> `RIDER.still` at `jhumru_cycle_body.webp` with `face:1`, and flipping
+> `EXPR_READY` is the whole job.
 
 ---
 
