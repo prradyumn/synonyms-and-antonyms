@@ -128,6 +128,64 @@ def build_audio():
         print('audio', dst, f'{(out / dst).stat().st_size / 1024:.0f}KB')
 
 
+# The wheelie set ships as PNG frame sequences on a shared 660x880 canvas with the
+# rear-wheel ground contact fixed at (191, 879). That anchor is the whole point:
+# it is the pivot a wheelie rotates about and the ground contact while riding, and
+# it matches the existing cycle sprite's own anchor (96/331 = 0.29 across, bottom).
+# So these must be cropped with ONE bbox shared across every frame of every
+# animation -- cropping each separately would drift the anchor and make him jump
+# on each sprite swap.
+WHEELIE_SRC = 'assets/chars/wheelie/jhumru-wheelie-set/frames'
+WHEELIE = {'wheelie_lift': 63, 'wheelie_hold': 83, 'wheelie_land': 63}   # ms/frame
+WHEELIE_ANCHOR = (191, 879)
+
+
+def build_wheelie():
+    """Crop the wheelie set to one shared bbox and emit animated WebP.
+
+    Prints the constants the runtime needs, because they fall out of the crop:
+    the anchor as a fraction of the cropped canvas, and how much taller the
+    wheelie box must be than the cycle box to keep the character the same size."""
+    root = ROOT / WHEELIE_SRC
+    if not root.exists():
+        print('skip wheelie (no frame folders)'); return
+    seqs = {}
+    for name in WHEELIE:
+        fs = sorted((root / name).glob('*.png'))
+        if fs:
+            seqs[name] = [Image.open(f).convert('RGBA') for f in fs]
+    if not seqs:
+        print('skip wheelie (no frames)'); return
+
+    x0, y0, x1, y1 = 10**9, 10**9, 0, 0
+    for frames in seqs.values():
+        for im in frames:
+            ys, xs = np.where(np.array(im)[:, :, 3] > 10)
+            x0, x1 = min(x0, xs.min()), max(x1, xs.max())
+            y0, y1 = min(y0, ys.min()), max(y1, ys.max())
+    pad = 4
+    x0, y0 = max(0, int(x0) - pad), max(0, int(y0) - pad)
+    src_h = seqs[list(seqs)[0]][0].height
+    x1, y1 = int(x1) + pad, min(src_h - 1, int(y1) + pad)
+    w, h = x1 - x0 + 1, y1 - y0 + 1
+
+    for name, frames in seqs.items():
+        out = [im.crop((x0, y0, x1 + 1, y1 + 1)) for im in frames]
+        dst = CH / f'{name}.webp'
+        out[0].save(dst, 'WEBP', save_all=True, append_images=out[1:],
+                    duration=[WHEELIE[name]] * len(out), loop=0 if name == 'wheelie_hold' else 1,
+                    quality=86, method=4)
+        real = anmf_durations(dst)
+        print('wheel', f'{name:14s}', (w, h), f'{len(real)} frames {sum(real)}ms',
+              f'{dst.stat().st_size / 1024:.0f}KB')
+
+    ax = (WHEELIE_ANCHOR[0] - x0) / w
+    ay = (WHEELIE_ANCHOR[1] - y0) / h
+    print(f'       shared bbox x[{x0}-{x1}] y[{y0}-{y1}] -> {w}x{h}')
+    print(f'       RUNTIME: anchor ({ax:.4f}, {ay:.4f})  aspect {w / h:.4f}  '
+          f'height x{h / (src_h / 2):.4f} of the cycle box')
+
+
 def build_join_trunk():
     """A trunk to lay OVER each act-layer segment join.
 
@@ -251,6 +309,7 @@ def main():
         print('char ', key, im.size)
     build_parallax()
     build_audio()
+    build_wheelie()
     for key, (fn, h, dur) in LOOPS.items():
         p = CH / fn
         if not p.exists():

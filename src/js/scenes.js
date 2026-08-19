@@ -94,28 +94,36 @@ function yAt(track,p){
 /* An actor positioned in PERCENTAGES, so a resize just re-places it. Its box is
    sized for its widest sprite -- object-fit:contain would otherwise shrink a wide
    walk cycle to fit a box cut for the narrower idle. */
-function mkActor(src,hu,ar,streaks){
+function mkActor(modes,defKey,streaks){
  /* three streaks at different heights, widths and phases so they read as motion
     rather than as a repeating pattern. Trail left, behind a right-facing rider. */
  const dash=streaks?[[52,64,0],[66,44,.17],[78,54,.33]].map(([top,wid,delay])=>
   '<div class="dash" style="top:'+top+'%;width:'+wid+'%;left:-'+(wid*0.75)+'%;'
   +'animation-delay:'+delay+'s"></div>').join(''):'';
- const w=el('<div class="cyc">'+dash+'<div class="cycsh"></div><img src="'+src+'"></div>');
+ const w=el('<div class="cyc">'+dash+'<div class="cycsh"></div><img></div>');
  F.appendChild(w);
- const o={w:w,img:w.querySelector('img'),x:0,y:0,f:1};
- /* streaks and the wheel loop both mean "the wheels are turning", so one switch */
+ const o={w:w,img:w.querySelector('img'),x:0,y:0,f:1,modes:modes,base:modes[defKey]};
  o.riding=on=>{w.classList.toggle('riding',!!on);
   if(streaks){if(on)play('bike');else stopSnd('bike')}};
+ /* Switch sprite set. Box size and anchor come from the mode, so a wider wheelie
+    canvas does not move him. */
+ o.show=k=>{const m=o.modes[k];if(!m||m===o.m)return;
+  o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.layout()};
  o.layout=()=>{
-  o.CH=U(hu);o.CW=Math.round(o.CH*ar);
+  const m=o.m||o.base;
+  o.CH=U(m.hu);o.CW=Math.round(o.CH*m.ar);
   w.style.width=o.CW+'px';w.style.height=o.CH+'px';o.place();
  };
  o.place=(x,y,f)=>{
   if(x!==undefined)o.x=x;if(y!==undefined)o.y=y;if(f!==undefined)o.f=f;
-  w.style.transform='translate('+(o.x/100*F.clientWidth-o.CW/2)+'px,'
-   +(o.y/100*F.clientHeight-o.CH)+'px) scaleX('+o.f+')';
+  const m=o.m||o.base,b=o.base,Fw=F.clientWidth;
+  /* The rear wheel is the fixed point. Its screen position is defined by the BASE
+     sprite's geometry, so every existing coordinate keeps meaning what it meant. */
+  const bCW=U(b.hu)*b.ar, anchorX=o.x/100*Fw - bCW/2 + b.ax*bCW;
+  w.style.transform='translate('+(anchorX - m.ax*o.CW)+'px,'
+   +(o.y/100*F.clientHeight - o.CH)+'px) scaleX('+o.f+')';
  };
- o.layout();
+ o.show(defKey);
  return o;
 }
 
@@ -155,8 +163,51 @@ const HOLD_X=42,MONTY_X=58;
    ochre PATH in act_bank -- measuring topmost-opaque instead finds the bushes
    standing BEHIND the path and leaves him floating ~32px above it. */
 const GROUND1=77.5,DECK=65.6,GROUND3=86;
-const LEG_A_Y=[[0,GROUND1],[.60,GROUND1],[.70,DECK],[1,DECK]];
-const LEG_B_Y=[[0,DECK],[.47,DECK],[.60,GROUND3],[1,GROUND3]];
+/* Both legs carry a ramp and a wheelie.
+
+   Leg A is the climb ONTO the bridge: the ramp rises the full bank-to-deck
+   distance, so the height change is explained rather than just happening.
+   Leg B is the ride off it: a shorter take-off ramp on the deck itself.
+
+   RAMP_*_RISE is the single source of truth for each -- it sets both the crest in
+   the Y track and the ramp's drawn height, so the two cannot drift apart and
+   leave him floating over the lip. Width follows from a 0.40 rise:run. */
+const RAMP_A_RISE=GROUND1-DECK, RAMP_A_TIP=0.70;   /* fraction along leg A */
+const RAMP_B_RISE=10.5,          RAMP_B_TIP=0.30;   /* fraction along leg B */
+
+const LEG_A_Y=[[0,GROUND1],[.55,GROUND1],[RAMP_A_TIP,DECK],[1,DECK]];
+const LEG_B_Y=[[0,DECK],[.17,DECK],[RAMP_B_TIP,DECK-RAMP_B_RISE],[.40,DECK-RAMP_B_RISE],
+               [.50,DECK],[.60,GROUND3],[1,GROUND3]];
+/* [leg fraction, sprite] -- lift before the ramp, hold over it, land coming off */
+const WHEELIE_A=[[0,'cyc'],[.47,'lift'],[.56,'hold'],[.72,'land'],[.82,'cyc']];
+const WHEELIE_B=[[0,'cyc'],[.17,'lift'],[.26,'hold'],[.42,'land'],[.52,'cyc']];
+/* and the body tilt that goes with each */
+const TILT_A=[[0,0],[.47,0],[.58,-14],[.70,-14],[.82,0],[1,0]];
+const TILT_B=[[0,0],[.17,0],[.30,-14],[.42,-14],[.52,0],[1,0]];
+
+/* A take-off ramp in the act layer, so it scrolls with the world. topY is the
+   height its crest reaches; it descends `rise` from there to its base. */
+function putRamp(rig,tipCam,topY,rise){
+ const Fh=F.clientHeight,rh=rise/100*Fh,rw=Math.round(rh/0.40),rp=svg(rampSVG());
+ rp.style.cssText='position:absolute;width:'+rw+'px;height:'+Math.round(rh)+'px;'
+  +'left:'+(tipCam*rig.span+HOLD_X/100*F.clientWidth-rw*0.94)+'px;'
+  /* bed it into the surface rather than perching on its top edge */
+  +'top:'+(topY/100*Fh+Fh*0.015)+'px;z-index:2';
+ rig.act.appendChild(rp);return rp;
+}
+/* Steps the rider through a wheelie table as p advances and tilts him with the
+   ramp. Returns the per-frame call. */
+function wheelieRun(J,table,tiltTrack){
+ let mode='';
+ return p=>{
+  for(let i=table.length-1;i>=0;i--)if(p>=table[i][0]){
+   if(mode!==table[i][1]){mode=table[i][1];J.show(mode);
+    if(mode==='lift')tone(520,.10);if(mode==='land')tone(300,.14)}
+   break}
+  J.img.style.transform='rotate('+yAt(tiltTrack,p).toFixed(1)+'deg)';
+ };
+}
+
 
 function hook(){
  clean();cur=0;pips();
@@ -180,7 +231,9 @@ function hook(){
   /* 322 = 215 * 1.5. Monty stays 185, so the elephant now reads 1.74x the monkey.
      For 1.5x the MONKEY instead, this is 278. Feet are unaffected either way --
      place() anchors on the ground line, not the top of the sprite. */
-  const J=mkActor(A.cyc,322,0.752,1),M=mkActor(IDLE.mon,185,0.70);
+  const J=mkActor(RIDER,'cyc',1);
+  const M=mkActor({idle:{url:IDLE.mon,hu:185,ar:0.70,ax:0.5},
+                   walk:{url:WALK.mon,hu:185,ar:0.70,ax:0.5}},'idle');
   J.place(-14,GROUND1);M.place(118,GROUND3,-1);   /* waits off the right edge */
   RELAY=()=>{rig.layout();J.layout();M.layout()};
 
@@ -188,36 +241,42 @@ function hook(){
   /* ---- stop 1: the near bank ---- */
   J.riding(1);
   tween(RIDE_IN,p=>J.place(-14+(HOLD_X+14)*easeOut(p),GROUND1),
-        ()=>{J.img.src=A.cycs;J.riding(0);tone(430,.12)});
+        ()=>{J.show('still');J.riding(0);tone(430,.12)});
   t=RIDE_IN;t+=say(HOOK.bank,t);
 
   /* ---- leg A: ride to the middle of the bridge ---- */
   later(()=>{
-   J.img.src=A.cyc;J.riding(1);
-   tween(LEG,p=>{rig.setF(p*.5);J.place(HOLD_X,yAt(LEG_A_Y,p))});
+   J.show('cyc');J.riding(1);
+   putRamp(rig,RAMP_A_TIP*.5,DECK,RAMP_A_RISE);      /* the climb onto the bridge */
+   const runA=wheelieRun(J,WHEELIE_A,TILT_A);
+   tween(LEG,p=>{rig.setF(p*.5);J.place(HOLD_X,yAt(LEG_A_Y,p));runA(p)},
+         ()=>{J.img.style.transform=''});
   },t);
   t+=LEG;
 
   /* ---- stop 2: he stops midspan and speaks, alone ---- */
-  later(()=>{J.img.src=A.cycs;J.riding(0);tone(430,.12)},t);
+  later(()=>{J.show('still');J.riding(0);tone(430,.12)},t);
   t+=say(HOOK.bridge,t);
 
   /* ---- leg B: both travel on to the clearing ---- */
   later(()=>{
-   J.img.src=A.cyc;J.riding(1);
-   tween(LEG,p=>{rig.setF(.5+p*.5);J.place(HOLD_X,yAt(LEG_B_Y,p))});
+   J.show('cyc');J.riding(1);
+   putRamp(rig,.5+RAMP_B_TIP*.5,DECK-RAMP_B_RISE,RAMP_B_RISE);
+   const runB=wheelieRun(J,WHEELIE_B,TILT_B);
+   tween(LEG,p=>{rig.setF(.5+p*.5);J.place(HOLD_X,yAt(LEG_B_Y,p));runB(p)},
+         ()=>{J.img.style.transform=''});
   },t);
   t+=LEG;
 
   /* ---- stop 3: the clearing, and Monty arrives from the right ---- */
-  later(()=>{J.img.src=A.cycs;J.riding(0);tone(430,.12)},t);
+  later(()=>{J.show('still');J.riding(0);tone(430,.12)},t);
   t+=SETTLE;
   later(()=>{
-   tone(560,.12);M.img.src=WALK.mon;
+   tone(560,.12);M.show('walk');
    /* walk cycle faces right, so scaleX(-1) to come leftward off the right edge */
    const si=every(()=>play('step'),360);   /* 8-frame cycle is 720ms -> 2 steps */
    tween(JOIN,p=>M.place(118+(MONTY_X-118)*easeOut(p),GROUND3,-1),
-         ()=>{M.img.src=IDLE.mon;cancel(si)});
+         ()=>{M.show('idle');cancel(si)});
   },t);
   t+=JOIN;t+=say(HOOK.clearing,t);
   later(done,t+250);
@@ -406,7 +465,7 @@ function gates(k){
  const g=GEN,r=L[k||0];
  const good=r[r.want],other=r[r.want==='syn'?'ant':'syn'];
  const rig=pxBuild(0);
- const J=mkActor(A.cyc,322,0.752,1);J.riding(1);
+ const J=mkActor(RIDER,'cyc',1);J.riding(1);
  J.place(HOLD_X,yAt(WORLD_Y,0));
  RELAY=()=>{rig.layout();J.layout();place()};
 

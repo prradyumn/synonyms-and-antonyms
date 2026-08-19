@@ -1,0 +1,161 @@
+{
+  "animation": "wheelie_hold",
+  "frameWidth": 660,
+  "frameHeight": 880,
+  "columns": 8,
+  "rows": 1,
+  "frameCount": 8,
+  "firstFrame": 0,
+  "lastFrame": 7,
+  "fps": 12,
+  "loop": true,
+  "anchor": {
+    "name": "rear-wheel-contact",
+    "x": 191,
+    "y": 879,
+    "normalized": [
+      0.29,
+      1.0
+    ]
+  },
+  "spacing": 0,
+  "margin": 0,
+  "frames": [
+    {
+      "detectedRearWheel": [
+        176,
+        349,
+        267,
+        426
+      ],
+      "scale": 0.923077,
+      "placement": [
+        -13,
+        486
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        142,
+        356,
+        221,
+        431
+      ],
+      "scale": 1.063291,
+      "placement": [
+        -2,
+        421
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        124,
+        356,
+        218,
+        431
+      ],
+      "scale": 0.893617,
+      "placement": [
+        38,
+        494
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        89,
+        362,
+        173,
+        434
+      ],
+      "scale": 1.0,
+      "placement": [
+        60,
+        445
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        168,
+        330,
+        257,
+        405
+      ],
+      "scale": 0.94382,
+      "placement": [
+        -10,
+        497
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        134,
+        333,
+        221,
+        406
+      ],
+      "scale": 0.965517,
+      "placement": [
+        20,
+        487
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        122,
+        333,
+        205,
+        406
+      ],
+      "scale": 1.012048,
+      "placement": [
+        26,
+        468
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        90,
+        334,
+        182,
+        407
+      ],
+      "scale": 0.913043,
+      "placement": [
+        67,
+        507
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    }
+  ]
+}

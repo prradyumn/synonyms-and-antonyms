@@ -1,0 +1,25 @@
+{
+  "animation": "wheelie_land",
+  "derivedFrom": "wheelie_lift",
+  "reversed": true,
+  "frameWidth": 660,
+  "frameHeight": 880,
+  "columns": 6,
+  "rows": 1,
+  "frameCount": 6,
+  "firstFrame": 0,
+  "lastFrame": 5,
+  "fps": 16,
+  "loop": false,
+  "anchor": {
+    "name": "rear-wheel-contact",
+    "x": 191,
+    "y": 879,
+    "normalized": [
+      0.29,
+      1.0
+    ]
+  },
+  "spacing": 0,
+  "margin": 0
+}

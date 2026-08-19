@@ -1,0 +1,127 @@
+{
+  "animation": "wheelie_lift",
+  "frameWidth": 660,
+  "frameHeight": 880,
+  "columns": 6,
+  "rows": 1,
+  "frameCount": 6,
+  "firstFrame": 0,
+  "lastFrame": 5,
+  "fps": 16,
+  "loop": false,
+  "anchor": {
+    "name": "rear-wheel-contact",
+    "x": 191,
+    "y": 879,
+    "normalized": [
+      0.29,
+      1.0
+    ]
+  },
+  "spacing": 0,
+  "margin": 0,
+  "frames": [
+    {
+      "detectedRearWheel": [
+        185,
+        348,
+        270,
+        419
+      ],
+      "scale": 0.988235,
+      "placement": [
+        -34,
+        465
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        126,
+        348,
+        205,
+        419
+      ],
+      "scale": 1.063291,
+      "placement": [
+        15,
+        433
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        98,
+        348,
+        182,
+        419
+      ],
+      "scale": 1.0,
+      "placement": [
+        51,
+        460
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        236,
+        313,
+        327,
+        384
+      ],
+      "scale": 0.923077,
+      "placement": [
+        -69,
+        525
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        196,
+        312,
+        286,
+        385
+      ],
+      "scale": 0.933333,
+      "placement": [
+        -34,
+        520
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    },
+    {
+      "detectedRearWheel": [
+        142,
+        302,
+        216,
+        381
+      ],
+      "scale": 1.063291,
+      "placement": [
+        1,
+        474
+      ],
+      "rearWheelContact": [
+        191,
+        879
+      ]
+    }
+  ]
+}

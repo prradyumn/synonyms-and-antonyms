@@ -1,0 +1,16 @@
+{
+  "canvas": [
+    660,
+    880
+  ],
+  "anchor": [
+    191,
+    879
+  ],
+  "animations": {
+    "wheelie_lift": 6,
+    "wheelie_hold": 8,
+    "wheelie_land": 6
+  },
+  "previewFrames": 18
+}

@@ -33,6 +33,19 @@ function tagSVG(word,i){
 /* The drop target for a want:'ant' round. Its presence where a friend would
    otherwise stand IS the cue that this round wants the opposite. Runtime SVG,
    standing in for the word-stone prop specced in docs/03 Block C. */
+/* A short wooden take-off ramp laid on the bridge deck. Runtime SVG in the same
+   idiom as the signpost and the word-stone, matched to the deck's plank colours,
+   so it needs no new art and its angle stays tunable. */
+function rampSVG(){
+ return `<svg class="ramp" viewBox="0 0 300 120" preserveAspectRatio="none">
+  <path d="M0 120 C140 118 236 92 300 0 L300 120 Z" fill="#B07C3E"/>
+  <path d="M0 112 C140 110 234 84 298 -4 L300 6 C236 92 140 118 0 120 Z" fill="#D8A45E"/>
+  <g stroke="#A2702F" stroke-width="2.5" fill="none" opacity=".7">
+   <path d="M52 118 L54 108"/><path d="M104 115 L107 104"/><path d="M154 108 L158 96"/>
+   <path d="M202 94 L208 81"/><path d="M244 72 L252 58"/><path d="M280 40 L290 26"/>
+  </g>
+ </svg>`;
+}
 function stoneSVG(){
  return `<svg class="stone" viewBox="0 0 150 176">
   <ellipse cx="75" cy="166" rx="54" ry="9" fill="rgba(28,38,22,.3)"/>

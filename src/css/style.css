@@ -68,6 +68,10 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 .tag.held{cursor:grabbing;animation:none;z-index:20;filter:drop-shadow(0 calc(17 * var(--u)) calc(22 * var(--u)) rgba(0,0,0,.35))}
 .tag.gone{pointer-events:none}
 .arch{pointer-events:none}
+.ramp{position:absolute;z-index:2;pointer-events:none}
+/* On a wheelie only the rear wheel is down, so the contact shadow shrinks to sit
+   under it rather than spanning a wheelbase that is no longer on the ground. */
+.cyc.wheelie .cycsh{left:33%;width:16%;height:5%;bottom:-0.5%}
 .stone{position:absolute;z-index:4;width:calc(230 * var(--u));animation:stonep 1.7s ease-in-out infinite}
 .stone.lit{animation:none;filter:drop-shadow(0 0 calc(30 * var(--u)) rgba(255,242,178,1))}
 .ring{position:absolute;z-index:5;pointer-events:none}

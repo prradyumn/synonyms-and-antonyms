@@ -6,6 +6,7 @@ const A={bridge_broken:'assets/bg/bridge_broken.webp',bridge_fixed:'assets/bg/br
          far_sky:'assets/bg/far_sky.webp',mid_canopy:'assets/bg/mid_canopy.webp',
          near_leaves:'assets/bg/near_leaves.webp',near_grass:'assets/bg/near_grass.webp',
          join_trunk:'assets/bg/join_trunk.webp',act_bank:'assets/bg/act_bank.webp',act_bridge:'assets/bg/act_bridge.webp',act_clearing:'assets/bg/act_clearing.webp',
+         wlift:'assets/chars/wheelie_lift.webp',whold:'assets/chars/wheelie_hold.webp',wland:'assets/chars/wheelie_land.webp',
          cyc:'assets/chars/jhumru_cycle.webp',cycs:'assets/chars/jhumru_cycle_still.webp',
          ele:'assets/chars/jhumru.webp',mon:'assets/chars/monty.webp',tur:'assets/chars/tez.webp'};
 
@@ -16,6 +17,20 @@ const NAME={ele:'Jhumru',mon:'Monty',tur:'Tez'};
 const IDLE={mon:'assets/chars/monty_idle.webp',ele:'assets/chars/jhumru_idle.webp'};
 /* Walk cycles, for characters actually travelling. Faces right at rest. */
 const WALK={mon:'assets/chars/monty_walk.webp'};
+
+/* Jhumru's sprite modes. Every entry declares its own box aspect and its own
+   rear-wheel anchor as a fraction of that box, because the wheelie frames sit on
+   a wider canvas than the level-riding ones. Placement anchors on the REAR WHEEL,
+   so swapping modes never shifts him -- see place() in scenes.js.
+   hu/ar/ax for the wheelie modes are printed by build_wheelie(); re-run it and
+   paste them again if the frames are ever regenerated. */
+const RIDER={
+ cyc  :{url:'assets/chars/jhumru_cycle.webp',      hu:322, ar:331/440, ax:0.290},
+ still:{url:'assets/chars/jhumru_cycle_still.webp',hu:322, ar:331/440, ax:0.290},
+ lift :{url:'assets/chars/wheelie_lift.webp',      hu:314, ar:1.0886,  ax:0.409},
+ hold :{url:'assets/chars/wheelie_hold.webp',      hu:314, ar:1.0886,  ax:0.409},
+ land :{url:'assets/chars/wheelie_land.webp',      hu:314, ar:1.0886,  ax:0.409}
+};
 
 /* The opening is three stops: he introduces himself on the near bank, stops
    alone midway across the bridge to say what he is doing, and reaches the
