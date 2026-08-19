@@ -1,0 +1,61 @@
+{
+  "type": "expression_set",
+  "frameWidth": 662,
+  "frameHeight": 880,
+  "frameCount": 7,
+  "columns": 4,
+  "rows": 2,
+  "spacing": 0,
+  "margin": 0,
+  "order": "row-major",
+  "registration": "bottom-center",
+  "anchorX": 0.29,
+  "displayHeight": 322,
+  "sourceAspectRatio": "331/440",
+  "seamY": 280,
+  "featherPx": 12,
+  "frames": [
+    {
+      "index": 0,
+      "name": "still_proud",
+      "file": "full_frames/still_proud.png",
+      "headLayer": "head_layers/still_proud_head.png"
+    },
+    {
+      "index": 1,
+      "name": "still_think",
+      "file": "full_frames/still_think.png",
+      "headLayer": "head_layers/still_think_head.png"
+    },
+    {
+      "index": 2,
+      "name": "still_wow",
+      "file": "full_frames/still_wow.png",
+      "headLayer": "head_layers/still_wow_head.png"
+    },
+    {
+      "index": 3,
+      "name": "still_ask",
+      "file": "full_frames/still_ask.png",
+      "headLayer": "head_layers/still_ask_head.png"
+    },
+    {
+      "index": 4,
+      "name": "still_cheer",
+      "file": "full_frames/still_cheer.png",
+      "headLayer": "head_layers/still_cheer_head.png"
+    },
+    {
+      "index": 5,
+      "name": "still_confused",
+      "file": "full_frames/still_confused.png",
+      "headLayer": "head_layers/still_confused_head.png"
+    },
+    {
+      "index": 6,
+      "name": "still_encourage",
+      "file": "full_frames/still_encourage.png",
+      "headLayer": "head_layers/still_encourage_head.png"
+    }
+  ]
+}

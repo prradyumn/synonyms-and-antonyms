@@ -49,6 +49,12 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 /* object-fit so swapping between sprites of DIFFERENT aspect (idle 0.54 vs walk
    0.70) never stretches them; bottom-anchored so the feet stay on the ground. */
 .cyc img{display:block;position:relative;z-index:1;width:100%;height:100%;object-fit:contain;object-position:50% 100%;transform-origin:50% 50%}
+/* The face overlay shares the body sprite's box. Both source canvases are
+   331x440, so the same object-fit lands them on identical pixels however the box
+   is sized -- which is the point: the body is ONE file, so it cannot drift
+   between expressions the way seven flattened sprites did. */
+.cyc img.face{position:absolute;left:0;top:0;z-index:2}
+.cyc img.face[hidden]{display:none}
 .cycsh{position:absolute;left:13%;bottom:-1%;width:74%;height:9%;border-radius:50%;background:radial-gradient(closest-side,rgba(34,22,8,.5),rgba(34,22,8,.2),rgba(34,22,8,0))}
 .vine{position:absolute;left:0;right:0;bottom:calc(244 * var(--u));height:calc(48 * var(--u));z-index:5;pointer-events:none}
 .ramp{position:absolute;z-index:2;pointer-events:none}

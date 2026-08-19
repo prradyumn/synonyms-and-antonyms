@@ -14,6 +14,27 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
 /* Idle breathing loop, used wherever Jhumru just stands there. */
 const IDLE={ele:'assets/chars/jhumru_idle.webp'};
 
+/* Head-only overlays for the stopped bicycle. All 331x440 like the body, so they
+   need no placement of their own.
+
+   One thing they cannot do: the delivered art's seam runs through the middle of
+   his open mouth, so the lower lip and tongue belong to the body and are shared
+   by every expression. Eyes, brows, ears and trunk carry all the difference --
+   which is most of what reads at this size anyway, and every line in the opening
+   is spoken, so an open mouth is right for all of them. `confused` and
+   `encourage` are the two that would rather be closed-mouthed; they are for
+   answer feedback, and are unused until the mechanic lands. */
+const FACES={
+ neutral  :'assets/chars/face_neutral.webp',
+ proud    :'assets/chars/face_proud.webp',
+ think    :'assets/chars/face_think.webp',
+ wow      :'assets/chars/face_wow.webp',
+ ask      :'assets/chars/face_ask.webp',
+ cheer    :'assets/chars/face_cheer.webp',
+ confused :'assets/chars/face_confused.webp',
+ encourage:'assets/chars/face_encourage.webp'
+};
+
 /* Jhumru's sprite modes. Every entry declares its own box aspect and its own
    rear-wheel anchor as a fraction of that box, because the wheelie frames sit on
    a wider canvas than the level-riding ones. Placement anchors on the REAR WHEEL,
@@ -22,7 +43,10 @@ const IDLE={ele:'assets/chars/jhumru_idle.webp'};
    paste them again if the frames are ever regenerated. */
 const RIDER={
  cyc  :{url:'assets/chars/jhumru_cycle.webp',      hu:322, ar:331/440, ax:0.290},
- still:{url:'assets/chars/jhumru_cycle_still.webp',hu:322, ar:331/440, ax:0.290},
+ /* `still` is the body ALONE -- headless. A face overlay always supplies the head,
+    so an expression can change without re-encoding the bike underneath it. show()
+    guarantees a face is present whenever this mode is on screen. */
+ still:{url:'assets/chars/jhumru_cycle_body.webp',hu:322, ar:331/440, ax:0.290, face:1},
  lift :{url:'assets/chars/wheelie_lift.webp',      hu:314, ar:1.0886,  ax:0.409},
  hold :{url:'assets/chars/wheelie_hold.webp',      hu:314, ar:1.0886,  ax:0.409},
  land :{url:'assets/chars/wheelie_land.webp',      hu:314, ar:1.0886,  ax:0.409}
@@ -39,20 +63,23 @@ const RIDER={
    in order and the pause sizes itself to fit, so lines can be added or cut here
    without touching scenes.js.
    ------------------------------------------------------------------------- */
+/* `face` names an entry in FACES and holds for the rest of the stop unless a later
+   line changes it. Narrator lines carry one too, because he is still on screen
+   being talked about. */
 const HOOK={
  /* stop 1 -- the near bank, he introduces himself and his bicycle */
- bank:[{who:'nar',line:'Jhumru was setting off on an exciting adventure through the jungle on his new bicycle.'},
-       {who:'jhu',line:'Hello, everyone! Have you seen my new bicycle?'},
-       {who:'jhu',line:'Tring! Tring! Look at it! It is shiny! It is bright! It is sparkling!',fx:'bell'}],
+ bank:[{who:'nar',line:'Jhumru was setting off on an exciting adventure through the jungle on his new bicycle.',face:'neutral'},
+       {who:'jhu',line:'Hello, everyone! Have you seen my new bicycle?',face:'neutral'},
+       {who:'jhu',line:'Tring! Tring! Look at it! It is shiny! It is bright! It is sparkling!',fx:'bell',face:'proud'}],
  /* leg A -- he climbs on and pedals off, up the ramp onto the bridge */
  legA:[{who:'jhu',line:'Today, I am going on a jungle adventure journey!'}],
  /* stop 2 -- midway across the bridge, the trail map appears */
- bridge:[{who:'jhu',line:'I wonder what we will find along the way!'},
-         {who:'jhu',line:'Oh! The jungle path looks full of surprises and challenges.',fx:'map'}],
+ bridge:[{who:'jhu',line:'I wonder what we will find along the way!',face:'think'},
+         {who:'jhu',line:'Oh! The jungle path looks full of surprises and challenges.',fx:'map',face:'wow'}],
  /* stop 3 -- the clearing. He turns to the player and waits to be answered. */
- clearing:[{who:'jhu',line:'Will you come on this adventure with me?',fx:'ask'}],
+ clearing:[{who:'jhu',line:'Will you come on this adventure with me?',fx:'ask',face:'ask'}],
  /* and once they say yes */
- go:[{who:'nar',line:'Wonderful! Let us go!'}]
+ go:[{who:'nar',line:'Wonderful! Let us go!',face:'cheer'}]
 };
 
 /* ---------------------------------------------------------------------------

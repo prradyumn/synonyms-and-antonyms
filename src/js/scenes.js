@@ -99,9 +99,10 @@ function yAt(track,p){
    sized for its widest sprite -- object-fit:contain would otherwise shrink a wide
    walk cycle to fit a box cut for the narrower idle. */
 function mkActor(modes,defKey,rider){
- const w=el('<div class="cyc"><div class="cycsh"></div><img></div>');
+ const w=el('<div class="cyc"><div class="cycsh"></div><img><img class="face" hidden></div>');
  F.appendChild(w);
- const o={w:w,img:w.querySelector('img'),x:0,y:0,f:1,modes:modes,base:modes[defKey]};
+ const im=w.querySelectorAll('img');
+ const o={w:w,img:im[0],fimg:im[1],fk:'neutral',x:0,y:0,f:1,modes:modes,base:modes[defKey]};
  /* `rider` marks who the wheel loop belongs to */
  o.riding=on=>{w.classList.toggle('riding',!!on);
   if(rider){if(on)play('bike');else stopSnd('bike')}};
@@ -110,8 +111,15 @@ function mkActor(modes,defKey,rider){
  /* how far the rear wheel sits from the box centre, in px. The ramp needs this:
     his position along the slope is where the WHEEL is, not where the box is. */
  o.wheelDX=()=>{const b=o.base,bCW=U(b.hu)*b.ar;return (b.ax-0.5)*bCW};
+ /* Which head he wears. Kept across mode changes, so a stop can set the
+    expression once and the cycling and wheelie sprites -- which carry their own
+    heads -- just ignore it until he stops again. */
+ o.face=k=>{if(k&&FACES[k])o.fk=k;o.dress()};
+ /* Only the `still` mode is headless, and it is never drawn without this. */
+ o.dress=()=>{const m=o.m||o.base;
+  if(m.face){o.fimg.src=FACES[o.fk];o.fimg.hidden=false}else o.fimg.hidden=true};
  o.show=k=>{const m=o.modes[k];if(!m||m===o.m)return;
-  o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.layout()};
+  o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.dress();o.layout()};
  o.layout=()=>{
   const m=o.m||o.base;
   o.CH=U(m.hu);o.CW=Math.round(o.CH*m.ar);
@@ -274,16 +282,23 @@ function hook(){
  fon('pointerdown',skip);
  const done=()=>intro();
 
+ /* The faces go in here too: `still` is headless on its own, so a face arriving
+    late would show a body with no head for a frame. */
  Promise.all(['far_sky','mid_canopy','act_bank','act_bridge','act_clearing','cyc','cycs']
-  .map(k=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=A[k]})))
+  .map(k=>A[k]).concat(RIDER.still.url,Object.values(FACES))
+  .map(u=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=u})))
   .then(()=>{if(g===GEN)roll()});
 
+ /* Built by roll() once the plates are in; say() needs it to change his face, and
+    say() lives out here so the script drives the timings. */
+ let J=null;
  /* Plays one stop of HOOK. Each line carries its own voice and optional cue, and
     the stop's length falls out of how many lines it has -- so the script can grow
     or shrink in levels.js without touching any timing here. */
  const say=(lines,t0)=>{
   lines.forEach((l,i)=>later(()=>{
    ask(l.line,l.who);
+   if(l.face)J.face(l.face);
    if(l.fx==='bell')play('bell');
    if(l.fx==='map')trailMap();
    if(l.fx==='ask')askToCome();
@@ -322,7 +337,7 @@ function hook(){
   /* 322 = 215 * 1.5. Monty stays 185, so the elephant now reads 1.74x the monkey.
      For 1.5x the MONKEY instead, this is 278. Feet are unaffected either way --
      place() anchors on the ground line, not the top of the sprite. */
-  const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
+  J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
   J.place(-14,GROUND1);
   RELAY=()=>{rig.layout();J.layout()};
 

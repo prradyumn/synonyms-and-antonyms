@@ -6,6 +6,50 @@ actually ships.
 
 ---
 
+> ## ✅ Delivered and wired in
+>
+> The set arrived and is live in the opening. Source art is in
+> [assets/chars/expressions/](assets/chars/expressions/); `build_expressions()` in
+> [tools/build-assets.py](tools/build-assets.py) turns it into one headless body
+> plus eight head overlays in `assets/chars/`.
+>
+> **The pack itself was exact.** 662×880, seam at 280, anchor 0.29, every frame
+> byte-identical below the seam, rear-wheel contact at the same pixel in all
+> seven, and the base matched our own sprite with 0.0 delta. Two things came out
+> of checking it, and only one was the artist's:
+>
+> **1 · The seam runs through his mouth — my error, not theirs.** I picked y=140
+> by measuring which colours crossed that row and reported "flat grey and flat
+> white". I only ever tested the blue and white fractions; I never tested red. 70
+> of the 270 opaque pixels on that row are open mouth. So the lower lip and tongue
+> belong to the body layer and are **shared by all seven expressions** — the
+> closed-mouth instructions in prompts 2, 4 and 7 below were impossible to honour.
+>
+> It costs little in practice: every line in the opening is spoken, so an open
+> mouth is right for all five story beats. It does mean `confused` and
+> `encourage` can never be closed-mouthed. **A future round should put the seam at
+> y=162**, below the mouth and through the flat blue strap and flat white shirt —
+> just as reproducible, and it frees the mouth.
+>
+> **2 · The ears drifted in saturation.** Hue was spot on everywhere (within
+> 1.2°), but `wow`, `encourage` and `cheer` came back washed out and pink — up to
+> −0.19 saturation. The build corrects it by measuring each frame's warm pixels
+> against the approved still rather than by a typed-in number, so it stays right
+> if the pack is regenerated. Corrections applied: ×1.25, ×1.28, ×1.10.
+>
+> **Head overlays, not flattened sprites.** Flattening each delivered frame into
+> its own full sprite re-encodes the body seven more times, and lossy WebP left
+> 0.3% of body pixels differing by >24/255 along the bike outlines — a shimmer on
+> a character standing still while his face changes. Lossless fixes it at 532KB;
+> stacking transparent heads over **one shared body file** is exact *and* smaller,
+> at 79KB. `RIDER.still` is now the headless body and `mkActor().face(k)` supplies
+> the head, held across mode changes so the cycling and wheelie sprites — which
+> carry their own heads — simply ignore it.
+>
+> Expressions are driven from the script: each `HOOK` line takes a `face:` key.
+
+---
+
 ## The reference images to attach
 
 Three files, all exported and sitting in [docs/ref/](docs/ref/):

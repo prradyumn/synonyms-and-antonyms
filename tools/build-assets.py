@@ -198,6 +198,98 @@ def build_wheelie():
           f'height x{h / (src_h / 2):.4f} of the cycle box')
 
 
+EXPR_SRC = 'assets/chars/expressions/full_frames'
+EXPR = ['still_proud', 'still_think', 'still_wow', 'still_ask',
+        'still_cheer', 'still_confused', 'still_encourage']
+EXPR_SEAM = 280          # in the delivered 662x880 space; 140 at game resolution
+
+
+def warm(im, upto):
+    """The ear / trunk-tip / tail pixels, above `upto`, and their mean S and V.
+
+    Warm-and-saturated, which in this character is only ever those three things.
+    Restricted to the head so the red bicycle can never be caught by it."""
+    hsv = np.array(im.convert('RGB').convert('HSV')).astype(int)
+    a = np.array(im)[..., 3]
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    m = np.zeros(a.shape, bool)
+    m[:upto] = True
+    m &= (a > 200) & (s > 40) & ((h < 22) | (h > 240))
+    return m, s[m].mean(), v[m].mean()
+
+
+def build_expressions():
+    """Emit ONE headless body plus a head-only overlay per expression.
+
+    The obvious build -- flatten each delivered frame into its own full sprite --
+    was tried first and rejected on measurement. The delivered frames are our
+    sprite upscaled 2x with a new head, so flattening them means re-encoding the
+    body seven more times; lossy WebP then left 0.3% of body pixels differing by
+    more than 24/255 along the bike outlines, which is a shimmer on a character
+    who is standing still while his face changes. Encoding losslessly fixes that
+    but costs 532KB instead of 207KB.
+
+    Stacking a transparent head over one shared body file is both exact and
+    smaller: 79KB for the whole set, and the body is literally the same decoded
+    image in every frame because it is the same file.
+
+    The ears drift: hue is spot on across the set (within 1.2 degrees) but
+    saturation is not, and three frames came back noticeably washed out. The
+    correction is measured against the approved still rather than typed in, so it
+    stays right if the pack is ever regenerated."""
+    src = ROOT / EXPR_SRC
+    base_p = CH / 'jhumru_cycle_still.webp'
+    if not src.exists() or not base_p.exists():
+        print('skip expressions (no pack)'); return
+    base = Image.open(base_p).convert('RGBA')
+    seam = EXPR_SEAM * base.height // 880
+    total = 0
+
+    body = base.copy()
+    body.paste((0, 0, 0, 0), (0, 0, base.width, seam))
+    dst = CH / 'jhumru_cycle_body.webp'
+    body.save(dst, 'WEBP', quality=88, method=6)
+    total += dst.stat().st_size
+    print('body ', f'{dst.name:24s}', body.size, f'{dst.stat().st_size / 1024:.0f}KB')
+
+    def head_of(im, tag, sat=1.0, val=1.0):
+        nonlocal total
+        h = im.crop((0, 0, im.width, im.height))
+        h.paste((0, 0, 0, 0), (0, seam, im.width, im.height))
+        d = CH / f'face_{tag}.webp'
+        h.save(d, 'WEBP', quality=88, method=6)
+        total += d.stat().st_size
+        print('face ', f'{tag:24s}', h.size, f'sat x{sat:.2f} val x{val:.2f}',
+              f'{d.stat().st_size / 1024:.0f}KB')
+
+    head_of(base, 'neutral')
+
+    ref = Image.open(src / 'jhumru_cycle_still.png').convert('RGBA')
+    _, ref_s, ref_v = warm(ref, EXPR_SEAM)
+    for name in EXPR:
+        p = src / f'{name}.png'
+        if not p.exists():
+            print('skip (missing)', name); continue
+        im = Image.open(p).convert('RGBA')
+        m, s0, v0 = warm(im, EXPR_SEAM)
+        hsv = np.array(im.convert('RGB').convert('HSV')).astype(float)
+        hsv[..., 1][m] = np.clip(hsv[..., 1][m] * (ref_s / s0), 0, 255)
+        hsv[..., 2][m] = np.clip(hsv[..., 2][m] * (ref_v / v0), 0, 255)
+        rgb = Image.fromarray(hsv.astype(np.uint8), 'HSV').convert('RGB')
+        fixed = Image.merge('RGBA', (*rgb.split(), im.split()[3]))
+        head_of(fixed.resize(base.size, Image.LANCZOS),
+                name.replace('still_', ''), ref_s / s0, ref_v / v0)
+
+    print(f'       seam y={seam} of {base.height}; total {total / 1024:.0f}KB')
+    print('       NOTE: the seam crosses the OPEN MOUTH, so the lower lip and '
+          'tongue are\n'
+          '       shared by every expression -- closed-mouth variants are not '
+          'possible from\n'
+          '       this pack. A future round would need the seam at y=162, below '
+          'the mouth\n'
+          '       and through the flat blue strap instead.')
+
+
 def build_ramp():
     """Convert the ramp plate to WebP and MEASURE its surface.
 
@@ -364,6 +456,7 @@ def main():
             still = CH / f'{key}_still.webp'
             frames[LOOP_STILLS[key]].save(still, 'WEBP', quality=88, method=6)
             print('still', key, size, f'{still.stat().st_size / 1024:.0f}KB')
+    build_expressions()      # last: it swaps heads onto jhumru_cycle_still
 
 if __name__ == '__main__':
     main()
