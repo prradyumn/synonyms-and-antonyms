@@ -271,6 +271,38 @@ Levels return with a new mechanic — see `docs/08` for the four-option options 
 
 ---
 
+## Dev tool: the layout editor
+
+**Press E on any screen.** The game freezes mid-animation and every visible
+element can be dragged to move, stretched by its handles, nudged with the arrow
+keys and exported. `src/js/editor.js` — temporary; delete the file and its
+`<script>` tag to remove it.
+
+Every number it reports is in **1920x1080 design units**, so an exported
+`left: 913` pastes straight back as `calc(913 * var(--u))`. Percentages come out
+too (including `feetY`, the ground line a character stands on) because so much of
+this game is positioned in %.
+
+Three things made it fit this game rather than the reference implementation:
+
+- **CSS px are not design units here.** The reference assumes a stage under
+  `transform: scale(k)`, where they coincide. `#frame` has no such transform, so
+  1 unit is `scale()` CSS pixels and unit values must be multiplied on the way
+  into a style property. Writing them raw moves everything by `1/scale` and
+  compounds on every nudge.
+- **Actors are positioned purely by `transform: translate()`**, so `normalise()`
+  clears transform along with right/bottom/margin/inset — after pinning the
+  element to the box it already occupies, so nothing jumps.
+- **Freeze is exact, not approximate.** Every delay runs off one virtual clock
+  (`VT`), so `setPaused(true)` stops the story, camera, audio and speech together.
+  The editor drives it through `window.__gameFreeze`.
+
+It also doubles as a measuring tool: the export cross-checks the constants in
+`scenes.js` — the ramp reads `feetY 65.31%` against `DECK=65.3`, and a standing
+character `86.02%` against `GROUND3=86`.
+
+---
+
 ## Notes
 
 - Landscape 16:9 to match the background art. If you need portrait, the backgrounds must be repainted, not cropped.

@@ -137,7 +137,7 @@ addEventListener('resize',()=>{if(RELAY)RELAY()});
    music arrived with the map. One deliberate tap here unlocks audio first, and the
    opening then plays with sound under it. */
 function title(){
- clean();
+ clean();window.__scene='title';
  const rig=pxBuild(0);
  RELAY=()=>rig.layout();
  F.appendChild(el('<div class="over card"><h3>Word Tree</h3>'
@@ -253,7 +253,7 @@ function wheelieRun(J,r,legOf){
 }
 
 function hook(){
- clean();
+ clean();window.__scene='hook';
  const g=GEN;
 
  function skip(){intro()}                 /* clean() drops the listener for us */
@@ -379,7 +379,7 @@ function hook(){
    The clearing, camera parked where the opening left it and everyone standing
    where they stopped, so the handoff is a continuation rather than a cut. */
 function intro(){
- clean();
+ clean();window.__scene='intro';
  const rig=pxBuild(1),bt='bottom:'+(100-GROUND3)+'%';
  RELAY=()=>rig.layout();
  chip('ele','left:'+HOLD_X+'%;'+bt).classList.add('px');

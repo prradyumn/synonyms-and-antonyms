@@ -51,6 +51,8 @@ function setPaused(on){
  if(on)Object.keys(SND).forEach(k=>{const a=SND[k];if(!a.paused)a.pause()});
  else if(!muted&&audioOn){play('bgm');if(F.querySelector('.cyc.riding'))play('bike')}
 }
+/* the dev layout editor (src/js/editor.js) freezes the game through this */
+window.__gameFreeze=on=>setPaused(!!on);
 document.addEventListener('visibilitychange',()=>setPaused(document.hidden));
 addEventListener('pagehide',()=>setPaused(true));
 addEventListener('blur',()=>setPaused(true));
