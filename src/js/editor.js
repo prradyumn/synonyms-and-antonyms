@@ -106,9 +106,13 @@ function targets() {
   }
   return out;
 }
+/* Classes the game toggles as STATE. They must not go into a key, or the same
+   element exports as `.cyc` in one run and `.cyc.riding` in the next and the two
+   look like different things. */
+const STATE_CLASSES = ['riding', 'held', 'gone', 'away', 'lit', 'on', 'q', 'shake', 'wob', 'sway'];
 function keyFor(el) {
   if (el.id) return '#' + el.id;
-  const cls = [...el.classList];
+  const cls = [...el.classList].filter((c) => STATE_CLASSES.indexOf(c) < 0);
   for (const a of CONFIG.keyAttrs) if (el.dataset[a]) {
     const base = cls.length ? '.' + cls[0] : el.tagName.toLowerCase();
     return base + '[data-' + a + '="' + el.dataset[a] + '"]';
@@ -284,11 +288,41 @@ function drawMini() {
 }
 
 // -- export -----------------------------------------------------------------
+/* A dragged ramp is only useful if it can go back into the code, so work out the
+   constants that would reproduce where it now sits. The placement in putRamp() is
+       left = tip*span + HOLD_X% * frame - width*0.94
+   and the game facts needed are fixed: three segments (span = 2 frames), and the
+   rider holds at HOLD_X. */
+const HOLD_X_UNITS = 0.42 * STAGE_W, SPAN_UNITS = 2 * STAGE_W;
+function rampCode(el, b) {
+  const act = document.querySelectorAll(CONFIG.stageSelector + ' .pxb')[2];
+  if (!act) return null;
+  const a = stageBox(act);
+  const leftInAct = b.x - a.x;
+  const tip = (leftInAct + b.w * 0.94 - HOLD_X_UNITS) / SPAN_UNITS;
+  const rise = +((b.h / STAGE_H) * 100).toFixed(2);
+  const legA = el.dataset.name === 'ramp-climb';
+  return {
+    which: el.dataset.name || 'ramp',
+    RAMP_RISE: rise,
+    RAMP_TIP: +(legA ? tip / 0.5 : (tip - 0.5) / 0.5).toFixed(3),
+    crestPercent: +((b.y / STAGE_H) * 100).toFixed(2),
+    basePercent: +(((b.y + b.h) / STAGE_H) * 100).toFixed(2),
+    note: legA ? 'set RAMP_A_TIP / RAMP_A_RISE' : 'set RAMP_B_TIP / RAMP_B_RISE',
+  };
+}
+
 function collect() {
   const items = {};
+  const seen = {};
   for (const { el, label } of targets()) {
     const b = stageBox(el);
-    items[keyFor(el)] = {
+    /* two elements can share a class; suffix rather than silently overwrite --
+       the first export lost one of the two ramps this way */
+    let k = keyFor(el);
+    seen[k] = (seen[k] || 0) + 1;
+    if (seen[k] > 1) k += ' (' + seen[k] + ')';
+    items[k] = {
       label,
       units: { left: Math.round(b.x), top: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h) },
       percent: {
@@ -299,6 +333,7 @@ function collect() {
       },
       centreOffset: [Math.round(b.x + b.w / 2 - STAGE_W / 2), Math.round(b.y + b.h / 2 - STAGE_H / 2)],
       edited: edited.has(el),
+      code: el.classList.contains('ramp') ? rampCode(el, b) : undefined,
     };
   }
   return {

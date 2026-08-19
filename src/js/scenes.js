@@ -213,9 +213,11 @@ function putRamp(rig,tipCam,crestY,rise,behind){
  /* `behind` slots the ramp before a segment so that segment paints OVER its
     cut right edge -- otherwise the flat end of the plate sits on top of the
     deck as a hard vertical line, which reads as pasted on. */
+ rp.dataset.name=behind?'ramp-climb':'ramp-kick';   /* so exports can tell them apart */
  if(behind)rig.act.insertBefore(rp,behind);else rig.act.appendChild(rp);
  const left=tipCam*rig.span+HOLD_X/100*Fw-rw*0.94;
  const sh=el('<div class="rampsh"></div>');
+ sh.dataset.name=(behind?'ramp-climb':'ramp-kick')+'-shadow';
  sh.style.cssText='position:absolute;z-index:1;left:'+(left+rw*0.03)+'px;'
   +'top:'+((crestY+rise)/100*Fh-rh*0.10)+'px;'
   +'width:'+Math.round(rw*0.96)+'px;height:'+Math.round(rh*0.20)+'px';
@@ -309,9 +311,10 @@ function hook(){
   /* 322 = 215 * 1.5. Monty stays 185, so the elephant now reads 1.74x the monkey.
      For 1.5x the MONKEY instead, this is 278. Feet are unaffected either way --
      place() anchors on the ground line, not the top of the sprite. */
-  const J=mkActor(RIDER,'cyc',1);
+  const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
   const M=mkActor({idle:{url:IDLE.mon,hu:185,ar:0.70,ax:0.5},
                    walk:{url:WALK.mon,hu:185,ar:0.70,ax:0.5}},'idle');
+  M.w.dataset.name='monty';
   J.place(-14,GROUND1);M.place(118,GROUND3,-1);   /* waits off the right edge */
   RELAY=()=>{rig.layout();J.layout();M.layout()};
 

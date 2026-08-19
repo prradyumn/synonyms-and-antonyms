@@ -297,6 +297,19 @@ Three things made it fit this game rather than the reference implementation:
   (`VT`), so `setPaused(true)` stops the story, camera, audio and speech together.
   The editor drives it through `window.__gameFreeze`.
 
+### Moving a ramp with it
+
+Drag the ramp, then export: each ramp carries a `code` block giving the
+`RAMP_*_TIP` and `RAMP_*_RISE` that reproduce where you put it. Paste those two
+numbers into `scenes.js` and the rider's path follows automatically, because the
+height comes from the ramp's measured surface rather than a separate track.
+
+**Export before the scene restarts.** The ramps are rebuilt every time `hook()`
+runs and the editor's edits are inline styles on the old elements, so replaying
+the opening discards them. If an export comes back with `"edited": false` on the
+ramp, the edit was lost that way — the geometry will match the code exactly,
+which is the tell.
+
 It also doubles as a measuring tool: the export cross-checks the constants in
 `scenes.js` — the ramp reads `feetY 65.31%` against `DECK=65.3`, and a standing
 character `86.02%` against `GROUND3=86`.
