@@ -6,7 +6,15 @@ actually ships.
 
 ---
 
-> ## ⏸ Delivered, and parked pending a re-EXPORT
+> ## ⛔ Superseded by [docs/16](16-expression-stills-brief.md)
+>
+> This asked for head layers to composite onto our sprite, and that turned out to be
+> unsatisfiable: registering a head to the right size pushes its chin past row 280
+> where the art stops, so registration and the seam are mutually exclusive. The
+> replacement asks for complete stills from the rig instead — nothing to register,
+> nothing to join. Keep this page for the measurements; do not brief from it.
+>
+> ## ⏸ Original note: delivered, and parked pending a re-EXPORT
 >
 > The art is right. The export is not, and it cannot be fixed downstream. Source
 > is in [assets/chars/expressions/](assets/chars/expressions/); the build step is
