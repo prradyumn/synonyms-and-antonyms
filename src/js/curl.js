@@ -31,12 +31,17 @@ const FRAME = () => document.querySelector('#frame');
 const WRAP  = () => document.querySelector('#wrap');
 
 /* logical units, in the game's 1920x1080 design space */
-const CURL_W     = 64;   /* width of the curl band */
-const BLACK_LEAD = 18;   /* how far the black lip runs ahead of the fold */
+const CURL_W     = 88;   /* width of the curl band */
+const BLACK_LEAD = 24;   /* how far the black lip runs ahead of the fold */
 const STRIP      = 12;   /* strip height for the wave deformation */
 const ROUND      = 18;   /* #frame's border-radius, kept during the clip */
 
-const DEFAULTS = { direction: 'left-to-right', duration: 950, hold: 80 };
+/* 1600ms with a power-1.7 ease-out rather than 950ms with a cubic. Cubic put 79%
+   of the travel into the first 40% of the time, so the curl flicked across and
+   then crept -- it read as a flash rather than an unroll. 1.7 spreads it to 59%
+   over the same span, which is what makes the edge readable while it moves. */
+const DEFAULTS = { direction: 'left-to-right', duration: 1600, hold: 90 };
+const EASE_POW = 1.7;
 
 let state   = 'idle';    /* idle | armed | running | done */
 let mode    = DEFAULTS.direction;
@@ -83,7 +88,7 @@ function shape(p) {
     w = p / 0.10;                                   /* curl grows in */
   } else if (p < 0.85) {
     const q = (p - 0.10) / 0.75;
-    f = 0.012 + (1 - Math.pow(1 - q, 3)) * 0.988;   /* reaches exactly 1 at 0.85 */
+    f = 0.012 + (1 - Math.pow(1 - q, EASE_POW)) * 0.988;  /* exactly 1 at 0.85 */
   } else {
     const q = (p - 0.85) / 0.15;
     /* The overshoot only ever pushes PAST the edge -- it must never dip back

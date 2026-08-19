@@ -27,8 +27,8 @@ Promise.all(OPENING_LAYERS.map(k => new Promise(r => {
 }))).then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
   openingCurl.play({
     direction: 'left-to-right',
-    duration: 950,
-    hold: 80,
+    duration: 1600,
+    hold: 90,
     onComplete: () => { const b = playBtn(); if (b) b.disabled = false; },
   });
 })));
