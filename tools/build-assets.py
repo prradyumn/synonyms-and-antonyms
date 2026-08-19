@@ -444,6 +444,7 @@ def build_portraits():
 
 GORGE_SRC = 'assets/bg/gorge-src/png'
 GORGE_ACT = ['act_gorge_near', 'act_gorge_span', 'act_gorge_far']
+GORGE_EDGE = 64      # columns of alpha fade at each plate's left and right edge
 
 
 def ride_top(a, x, run=14, need=10, y_from=280):
@@ -488,6 +489,19 @@ def build_gorge():
         if not p_in.exists():
             print('skip (missing)', name); continue
         im = Image.open(p_in).convert('RGBA')
+        if name in GORGE_ACT:
+            # Each plate is cropped square at its own edges, and the runtime now
+            # OVERLAPS them, so a plate's hard left edge lands in the middle of its
+            # neighbour's art -- where a rim block ending in a straight vertical line
+            # across open sky is the most obvious thing on screen. Fading the outer
+            # columns lets one plate settle into the other. The deck starts well
+            # inside the fade on every plate, so nothing rideable is softened.
+            a = np.array(im).astype(float)
+            for i in range(GORGE_EDGE):
+                k = (i + 1) / GORGE_EDGE
+                a[:, i, 3] *= k
+                a[:, -1 - i, 3] *= k
+            im = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')
         dst = BG / f'{name}.webp'
         im.save(dst, 'WEBP', quality=76, method=6)
         print('gorge', f'{name:16s}', im.size, f'{dst.stat().st_size / 1024:.0f}KB')

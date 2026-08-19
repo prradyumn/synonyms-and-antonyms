@@ -17,8 +17,18 @@ const SEG=['act_bank','act_bridge','act_clearing'];
    interior, which has to travel slower than the deck so that what shows through the
    hole in the bridge slides more slowly than the hole does. That differential IS
    the depth effect; matched rates would look painted on. */
-function pxBuild(f0,segs,mid){
+function pxBuild(f0,segs,mid,laps){
  segs=segs||SEG;
+ /* `laps` OVERLAPS neighbouring plates instead of butting them, in design units.
+    The gorge plates were each drawn self-contained, with their own rim at both
+    edges -- so butted, the approach's thin bridge stub is followed by the span's
+    240px rim block and you see two different structures meet. Pulling the span
+    left by its rim width lands that rim ON the approach's edge, which is what it
+    is a drawing of. Where laps are given the join trunks are dropped: an overlap
+    that works needs no cover, and a tree was the wrong object over a rocky rim. */
+ laps=laps||[];
+ const lapAt=i=>laps.slice(0,i).reduce((a,b)=>a+b,0);
+ const lapAll=lapAt(segs.length);
  /* The camera is a FRACTION of total travel (0 = bank, .5 = bridge, 1 = clearing),
     never a pixel count. Every pixel is recomputed from the live frame width by
     layout(), so a resize cannot leave the layers and the riders disagreeing about
@@ -45,7 +55,7 @@ function pxBuild(f0,segs,mid){
  /* One trunk laid over each segment join. Both plates carry a full-height edge
     trunk, so where two segments butt you get two HALF trunks on a hard vertical
     edge plus a tonal step; one trunk spanning the join reads as scenery. */
- const joins=segs.slice(1).map(()=>{
+ const joins=laps.length?[]:segs.slice(1).map(()=>{
   const t=el('<div></div>');
   t.style.cssText='position:absolute;top:0;height:100%;background-size:100% 100%;'
    +'background-repeat:no-repeat;background-image:url('+A.join_trunk+')';
@@ -57,16 +67,18 @@ function pxBuild(f0,segs,mid){
 
  rig.layout=()=>{
   const Fw=Math.round(F.clientWidth);
-  rig.span=Fw*(segs.length-1);         /* total camera travel, in px */
+  const u=Fw/1920;
+  rig.span=Fw*(segs.length-1)-lapAll*u;   /* total camera travel, in px */
   rig.forEach(o=>{
    if(o.tile){
     o.el.style.width=(Fw*4)+'px';
     o.el.style.backgroundSize=(Fw*2)+'px 100%';
     if(o.strip)o.el.style.height=Math.round(Fw*o.strip/1920)+'px';
-   } else o.el.style.width=(Fw*(o.wide||segs.length))+'px';
+   } else o.el.style.width=(Fw*(o.wide||segs.length)-(o.wide?0:lapAll*u))+'px';
   });
   /* 1px wider than a frame so neighbours overlap rather than risk a hairline gap */
-  plates.forEach((g,i)=>{g.style.left=(i*Fw)+'px';g.style.width=(Fw+1)+'px'});
+  plates.forEach((g,i)=>{
+   g.style.left=Math.round(i*Fw-lapAt(i)*u)+'px';g.style.width=(Fw+1)+'px'});
   joins.forEach((t,i)=>{
    const tw=Math.round(Fw*230/1920);
    t.style.left=((i+1)*Fw-tw/2)+'px';t.style.width=tw+'px'});
@@ -75,6 +87,7 @@ function pxBuild(f0,segs,mid){
  rig.setF=f=>{rig.f=f;rig.forEach(o=>{
   o.el.style.transform='translateX('+Math.round(-f*rig.span*o.rate)+'px)'})};
  rig.layout();
+ window.__rig=rig;      /* test hook: step the camera by hand */
  return rig;
 }
 
@@ -416,22 +429,36 @@ function hook(){
    guessed waypoints. Same approach as the ramp. */
 function gorge(){
  clean();window.__scene='gorge';
- const rig=pxBuild(0,GORGE.seg,{key:'mid_gorge',rate:GORGE.midRate});
+ const rig=pxBuild(0,GORGE.seg,{key:'mid_gorge',rate:GORGE.midRate},GORGE.laps);
  const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
  RELAY=()=>{rig.layout();J.layout()};
 
- const n=GORGE.seg.length;
- /* The plates concatenate into one track, so a world fraction indexes straight
-    into it. He sits at HOLD_X of the frame, so his own position runs ahead of the
-    camera by that much. */
+ const n=GORGE.seg.length,laps=GORGE.laps;
+ /* Everything below is in DESIGN units, so it is resolution-independent and the
+    overlaps only have to be reasoned about once.
+
+    The plates overlap, so a plate's world position is not i*1920 -- and the later
+    plate is drawn on top, so where two profiles cover the same world x the later
+    one is the surface he actually rides. Hence the track is built in order and
+    later points overwrite earlier ones. */
+ const lapTo=i=>laps.slice(0,i).reduce((a,b)=>a+b,0);
+ const worldW=1920*n-lapTo(n);
  const track=[];
- GORGE.prof.forEach((pr,i)=>pr.forEach((y,j)=>
-  track.push([(i+j/(pr.length-1))/n,y])));
- const worldAt=f=>(f*(n-1)+HOLD_X/100)/n;
+ GORGE.prof.forEach((pr,i)=>{
+  const left=i*1920-lapTo(i);
+  pr.forEach((y,j)=>{
+   const f=(left+j*1920/(pr.length-1))/worldW;
+   while(track.length&&track[track.length-1][0]>=f-1e-9)track.pop();
+   track.push([f,y]);
+  });
+ });
+ const travel=1920*(n-1)-lapTo(n);
+ const worldAt=f=>(f*travel+HOLD_X/100*1920)/worldW;
  const yOf=f=>yAt(track,worldAt(f));
- /* Stop with the gap ahead of him rather than under him: back off GORGE.margin of
-    a plate from the measured near edge. */
- const stopF=Math.min(1,(GORGE.gap*n-HOLD_X/100-0.14)/(n-1));
+ /* The gap's near edge in world units, then backed off so it sits AHEAD of him
+    rather than under him. Both come off the measured alpha, not the delivered spec. */
+ const gapW=(1920-laps[0]+GORGE.gapPx[0])/worldW;
+ const stopF=Math.min(1,(gapW*worldW-HOLD_X/100*1920-250)/travel);
 
  J.place(-12,yOf(0));
  let armed=1;

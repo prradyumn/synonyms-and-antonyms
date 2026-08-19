@@ -44,6 +44,12 @@ const PORTRAIT={
 const GORGE={
  seg:['g_near','g_span','g_far'],
  midRate:0.62,
+ /* Overlap per join, in design units. Each plate was drawn self-contained with its
+    own rim at both edges, so butted they stack two structures. Measured off the
+    alpha: the span's left rim block runs x0-240 and its right rim x1720-1920, so
+    pulling each following plate left by that much lands one plate's rim on the
+    other's edge instead of beside it. */
+ laps:[240,200],
  gap:0.4790,        /* the gap's near edge, as a fraction of the whole world */
  gapPx:[839,1071],      /* measured off the alpha: 233px, not the 192 in their spec */
  deck:65.28,
