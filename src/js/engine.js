@@ -3,7 +3,7 @@
 
 const $=s=>document.querySelector(s),F=$('#frame'),BG=$('#bg'),BG2=$('#bg2'),FX=$('#fx'),AIR=$('#air'),STAGE=$('#stage');
 
-[...Object.values(A),...Object.values(IDLE)].forEach(u=>{const i=new Image();i.src=u});
+Object.values(A).forEach(u=>{const i=new Image();i.src=u});
 
 let GEN=0,T=[];
 
@@ -146,6 +146,4 @@ function camTo(z,ms,ox,oy,after){
  if(m||!ms){STAGE.style.transform='scale('+z+')';if(after)after();return}
  tween(ms,p=>{STAGE.style.transform='scale('+(from+(z-from)*easeOut(p))+')'},after);
 }
-/* parent lets a character be mounted inside a scrolling parallax layer, so it
-   travels with the world instead of being pinned to the frame */
-function chip(kind,side,parent){const c=el('<img class="ch '+kind+'" src="'+(IDLE[kind]||A[kind])+'" style="'+side+'">');(parent||F).appendChild(c);return c}
+

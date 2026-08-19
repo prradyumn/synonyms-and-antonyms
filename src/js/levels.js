@@ -11,11 +11,14 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
          cyc:'assets/chars/jhumru_cycle.webp',cycs:'assets/chars/jhumru_cycle_still.webp',
          g_near:'assets/bg/act_gorge_near.webp',g_span:'assets/bg/act_gorge_span.webp',
          g_far:'assets/bg/act_gorge_far.webp',mid_gorge:'assets/bg/mid_gorge.webp',
-         plank:'assets/chars/prop_plank.webp',
-         ele:'assets/chars/jhumru.webp'};
+         plank:'assets/chars/prop_plank.webp'};
 
-/* Idle breathing loop, used wherever Jhumru just stands there. */
-const IDLE={ele:'assets/chars/jhumru_idle.webp'};
+/* The idle breathing loop and the standing sprite are OUT of the shipped set.
+   Nothing draws them: chip() was their only consumer and its last call went when
+   the opening stopped handing off to a standing-around scene. Between them they
+   were 936KB of the 4.5MB boot -- a fifth of it -- fetched every load and never
+   shown. `python tools/build-assets.py` regenerates both from the GIFs in
+   assets/chars, which stay in git. Add them back to A when a scene needs them. */
 
 /* Dialogue portraits -- a face beside the speech text, not a swap on the bike.
 
