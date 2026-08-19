@@ -50,6 +50,7 @@ docs/07-mechanic-ideas.md              six alternatives to the three-tile MCQ
 docs/08-four-option-mechanics.md        getting to four options without four times the load
 docs/09-mechanic-visual-prompts.md      prompts to SEE the four-option mechanics before building
 docs/10-immersive-scene-playbook.md      REUSABLE — ideation + parallax/bg prompt packages for any game
+docs/11-wheelie-sprites.md              wheelie-over-a-ramp: sprites to commission, and what to derive
 
 prototypes/v1-tap-to-answer.html      earlier version, tap only
 prototypes/v2-carry-the-word.html     same as src/, single-file, base64
