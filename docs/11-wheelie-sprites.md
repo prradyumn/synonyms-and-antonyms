@@ -272,3 +272,87 @@ Send the files over and I will:
 
 The runtime side is small. The alignment is the part that will bite, which is why
 it is the one instruction repeated in every prompt above.
+
+---
+
+# The ramp asset — prompt
+
+Currently `rampSVG()` in `sprites.js` draws it at runtime. A painted plate will
+match the bridge properly. **Attach `assets/source/px_act_bridge.png`** as the
+style reference.
+
+## The geometry rule — read this first
+
+The code treats the image's own box **as** the ramp: its bottom edge sits on the
+deck, its top edge is the crest. `RAMP_A_RISE` / `RAMP_B_RISE` then drive both the
+Y-track and the drawn height from one number, which is what stops the rider
+floating over the lip.
+
+So the ramp surface must run **corner to corner**:
+
+- it touches the **bottom-left** corner of the image, and
+- it reaches the **top-right** corner,
+- with **no transparent margin** at either of those corners.
+
+Any padding there and the wheels will sit off the surface by exactly that much.
+
+Rise is 40% of the length — a **5:2 image**. On screen it renders at most
+~321×128, so deliver **640×256 or larger**. One asset serves both ramps; the code
+scales it.
+
+## Prompt — the climb ramp
+
+```
+Match the attached reference image EXACTLY in art style, colour palette and line
+quality: the same flat 2D cartoon look and the same warm pale plank wood as the
+bridge deck. This is the same carpentry, by the same builder.
+
+A single game PROP isolated on a FULLY TRANSPARENT background. No scene, no
+environment, no ground line, no characters, no shadow cast onto the backdrop.
+
+A short wooden ramp seen from the SIDE, rising from LEFT to RIGHT. Wide 5:2
+landscape proportions.
+
+GEOMETRY -- follow exactly:
+- The ramp's top surface begins at the very BOTTOM-LEFT corner of the image and
+  rises in one gentle continuous curve to the very TOP-RIGHT corner.
+- Both of those corners must be solid ramp, touching the image edge, with no
+  transparent gap or margin.
+- The rise is shallow and friendly -- something a small character cycles up
+  comfortably, not a steep jump.
+- Solid wood fills the area beneath the surface, down to the bottom edge.
+
+Built from plain planks laid across the slope, with a few visible board joins and
+a simple thicker board along the top surface edge. Pale weathered wood, warm
+tone, simple flat shading. Clean and uncluttered.
+
+Do NOT include: any rope, any metal, any bolts, any skate-park styling, any
+graffiti or markings, any text, any grass or plants, any rocks, any steep or
+dangerous angle, any characters, any ground beneath it.
+```
+
+## Optional second variant — the take-off kicker
+
+Leg A is a climb *onto* the bridge, so its ramp should join the deck smoothly.
+Leg B is a take-off, where a lip reads better. If you want both, generate the
+climb ramp first, then attach it:
+
+```
+The SAME wooden ramp as the attached image, in the SAME style, wood and
+proportions, with ONE change: the top-right end now finishes in a small rounded
+upward LIP, like a take-off kicker. Everything else identical -- same curve, same
+planks, same 5:2 proportions, and the surface still touches the bottom-left and
+top-right corners exactly.
+```
+
+## What to check
+
+- [ ] Surface touches bottom-left and top-right corners with no margin. Open it
+      on a dark background and look at those two corners specifically — this is
+      the one that will bite.
+- [ ] Same wood as the bridge, or does it read as imported from another game?
+- [ ] Shallow enough to cycle up.
+- [ ] Real alpha, no white matte, no halo. Composite over magenta.
+
+Send it over and I will measure the actual rise:run off the art, feed it into
+`RAMP_*_RISE`, and swap `rampSVG()` out for it.
