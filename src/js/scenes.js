@@ -44,7 +44,8 @@ function pxBuild(f0,segs,mid,laps){
  /* between the canopy (0.50) and the action plane (1.00), so it reads as nearer
     than the horizon treeline and further than the bridge */
  const gorge=mid?layer('pxb',1,'top:0;height:100%;background-repeat:no-repeat;'
-  +'background-size:100% 100%;background-image:url('+A[mid.key]+')'):null;
+  +'background-size:100% 100%;background-image:url('+A[mid.key]+')'
+  +(mid.dim?';filter:saturate(.86) brightness(.95)':'')):null;
  if(gorge)rig.push({el:gorge,rate:mid.rate,wide:mid.wide||segs.length});
  const act=layer('pxb',2,'top:0;height:100%');
  const plates=segs.map(k=>{
@@ -456,7 +457,7 @@ function hook(){
    guessed waypoints. Same approach as the ramp. */
 function gorge(){
  clean();window.__scene='gorge';
- const rig=pxBuild(0,GORGE.seg,{key:'mid_gorge',rate:GORGE.midRate},GORGE.laps);
+ const rig=pxBuild(0,GORGE.seg,{key:'mid_gorge',rate:GORGE.midRate,dim:1},GORGE.laps);
  const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
  RELAY=()=>{rig.layout();J.layout()};
 
@@ -481,7 +482,10 @@ function gorge(){
  });
  const travel=1920*(n-1)-lapTo(n);
  const worldAt=f=>(f*travel+HOLD_X/100*1920)/worldW;
- const yOf=f=>yAt(track,worldAt(f));
+ /* GORGE.drop is a percentage of his height; the track is percentages of frame
+    height, so convert once through hu/1080 rather than at every lookup. */
+ const drop=(GORGE.drop||0)*RIDER.still.hu/1080;
+ const yOf=f=>yAt(track,worldAt(f))+drop;
  /* The gap's near edge in world units, then backed off so it sits AHEAD of him
     rather than under him. Both come off the measured alpha, not the delivered spec. */
  const gapW=(1920-laps[0]+GORGE.gapPx[0])/worldW;

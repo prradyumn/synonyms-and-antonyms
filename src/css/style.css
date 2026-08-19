@@ -89,7 +89,22 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 @media (prefers-reduced-motion:reduce){
  .bell .ring,.bell .body{animation:none}
  .bell .ring{opacity:.35}}
-.cycsh{position:absolute;left:13%;bottom:-1%;width:74%;height:9%;border-radius:50%;background:radial-gradient(closest-side,rgba(34,22,8,.5),rgba(34,22,8,.2),rgba(34,22,8,0))}
+/* Contact shadow. One wide ellipse under the whole bike sat almost entirely BEHIND
+   the sprite and read as nothing, which is most of why he looked unattached: a
+   tyre's lowest point is a narrow tangent -- only 16px of the 331px sprite width is
+   opaque on its bottom row -- so with no shadow the eye takes the wheel's bulk as
+   its bottom and puts him about 10px in the air.
+
+   Two tight ellipses instead, under the measured wheel contacts at 29% and 78%
+   across, sitting proud of the tyres where they can be seen. */
+/* The positions are NOT the wheel percentages. background-position aligns the
+   IMAGE's own percentage point with the container's, so a 34%-wide ellipse asked for
+   at 29% ends up centred at 36% -- measured, it darkened the plank 9% too far
+   inboard. Centre C with width W wants (C - W/2) / (100 - W): 18.2% for the rear
+   wheel at 29%, 92.4% for the front at 78%. */
+.cycsh{position:absolute;left:0;bottom:-2.5%;width:100%;height:7%;
+ background:radial-gradient(closest-side,rgba(26,16,5,.55),rgba(26,16,5,.17),rgba(26,16,5,0)) 18.2% 52%/34% 100% no-repeat,
+  radial-gradient(closest-side,rgba(26,16,5,.55),rgba(26,16,5,.17),rgba(26,16,5,0)) 92.4% 52%/34% 100% no-repeat}
 .vine{position:absolute;left:0;right:0;bottom:calc(244 * var(--u));height:calc(48 * var(--u));z-index:5;pointer-events:none}
 .ramp{position:absolute;z-index:2;pointer-events:none}
 /* a soft shadow along the ramp's base, so it beds into the ground instead of
@@ -105,7 +120,10 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
  to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 @keyframes mapaway{from{opacity:1;transform:translate(-50%,-50%) scale(1)}
  to{opacity:0;transform:translate(-50%,-56%) scale(.85)}}
-.cyc.wheelie .cycsh{left:33%;width:16%;height:5%;bottom:-0.5%}
+/* In a wheelie only the rear wheel is down, and on that canvas its contact is at
+   40.9% across (ax in RIDER), not 29%. */
+.cyc.wheelie .cycsh{height:5%;bottom:-0.5%;
+ background:radial-gradient(closest-side,rgba(28,18,6,.5),rgba(28,18,6,.15),rgba(28,18,6,0)) 39.2% 60%/17% 100% no-repeat}
 /* .card is a centred panel rather than a full cover, so the scene stays visible.
    .ask sits off to the right because the question comes while Jhumru is stood
    at 42% -- centred, it covered his face. */

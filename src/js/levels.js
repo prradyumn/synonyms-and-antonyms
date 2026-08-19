@@ -44,6 +44,11 @@ const PORTRAIT={
 const GORGE={
  seg:['g_near','g_span','g_far'],
  midRate:0.62,
+ /* How far to bed the tyres into the ground, as a percentage of HIS height (322
+    design units) -- so it stays right at any frame size. 5% is about 12px on a
+    desktop frame: enough that the narrow tyre tangent reads as sitting in the
+    surface rather than kissing it. Raise it for softer ground, lower it for planks. */
+ drop:5,
  /* Overlap per join, in design units. Each plate was drawn self-contained with its
     own rim at both edges, so butted they stack two structures. Measured off the
     alpha: the span's left rim block runs x0-240 and its right rim x1720-1920, so
