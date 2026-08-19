@@ -289,6 +289,58 @@ Levels return with a new mechanic — see `docs/08` for the four-option options 
 
 ---
 
+## The opening curl reveal
+
+The game starts black and the scene unrolls from the left behind a travelling
+curled leaf edge. `src/js/curl.js`, exposed as `window.openingCurl`.
+
+```js
+openingCurl.arm();                       // cover before anything is built
+openingCurl.play({ direction: 'left-to-right', duration: 950, hold: 80,
+                   onCovered: null, onComplete: enableInput });
+openingCurl.skip();                      // jump to the finished state
+```
+
+Modes: `left-to-right`, `right-to-left`, `close-left`, `close-right` — so the same
+controller can sit between levels later.
+
+### How one mask wraps the existing parallax
+
+There is no canvas scene renderer here: the parallax layers, actors, ramps and
+props are DOM elements inside `#frame`, moved by CSS transforms. So there is no
+render function to wrap in `ctx.clip()`. The equivalent is to clip **their common
+ancestor** — one `clip-path: inset(...)` on `#frame`, which every layer inherits.
+
+Because there is physically a single clip, the layers cannot disagree about where
+the boundary is: no per-layer masks, no tearing, no exposed strips, and the
+scene's own positioning code is never touched. A temporary black backdrop sits
+behind `#frame` so the unrevealed side is true black rather than the page colour.
+
+The curl itself is the one place a canvas belongs: a narrow full-height canvas
+that travels with the boundary. Its cross-section — transparent shadow → dark
+underside → saturated green fold → pale highlight → black lip — is pre-rendered
+once and stamped per 12-unit strip with a wave offset, so no gradient, canvas or
+array is allocated during the animation.
+
+The black lip leads the fold and the clip sits at the lip, so the scene is
+revealed slightly past the fold and the curl's own black covers that sliver. That
+is what lets the visible edge follow the wavy fold with no gap.
+
+Time comes from `VT`, the game's own clock, so the reveal is frame-rate
+independent and honours the same pause contract as everything else.
+
+### Boot order
+
+`arm()` → `title()` builds the scene behind the cover → every layer the reveal
+will show is decoded → two frames to paint the hidden scene → `play()` → the Play
+button is enabled in `onComplete`.
+
+Skip on Space / Enter / Escape or any tap, and `?nocurl` or a reduced-motion
+preference lands straight in the finished state. `?curldebug` shows progress,
+`revealX`, curl width, state and the mask boundary.
+
+---
+
 ## Dev tool: the layout editor
 
 **Press E on any screen.** The game freezes mid-animation and every visible
