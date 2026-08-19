@@ -469,6 +469,69 @@ def ride_top(a, x, run=14, need=10, y_from=280):
     return None
 
 
+def band_top(a, x, minrun=40):
+    """Top of the LONGEST warm run in column x. For the approach plate.
+
+    There the path and the earth beneath it form one tall warm band, so its top is
+    the surface, and the short warm patches that fooled ride_top -- a rock sitting
+    above the path, a warm bit of distant canopy -- lose to it on length. It is the
+    wrong detector for the far plate, where a foreground bush hides the path and the
+    longest warm run is the ground BEHIND it, 160px too low."""
+    col = a[:, x]
+    R, G, B, A = col[:, 0], col[:, 1], col[:, 2], col[:, 3]
+    warm = (A > 200) & (R > 110) & (R - B > 35) & (G < R * 0.95) & (G > R * 0.30)
+    best_len, best_y, st = 0, None, None
+    for y in range(len(warm)):
+        if warm[y] and st is None:
+            st = y
+        elif not warm[y] and st is not None:
+            if y - st > best_len: best_len, best_y = y - st, st
+            st = None
+    if st is not None and len(warm) - st > best_len:
+        best_len, best_y = len(warm) - st, st
+    return best_y if best_len >= minrun else None
+
+
+# Which surface detector suits each plate, and which way its surface is allowed to
+# go. Neither detector works everywhere -- see the docstrings -- and the span needs
+# neither, because its deck is flat and measured. The monotonic constraint is design,
+# not a guess: the approach only ever climbs and the far side only ever eases down,
+# so a point that reverses is a misread and gets clamped to its neighbour. Without
+# it the approach's last points read 85% and 88% where the art is at 67%.
+GORGE_SURF = {'act_gorge_near': ('band', 'up'),
+              'act_gorge_span': ('flat', None),
+              'act_gorge_far':  ('ride', 'down')}
+
+
+def gorge_profile(a, name, pts=33):
+    """A surface profile for one plate, using the detector that suits it."""
+    how, mono = GORGE_SURF.get(name, ('ride', None))
+    w = a.shape[1]
+    if how == 'flat':
+        deck = ride_top(a, w // 4)
+        return [deck / a.shape[0] * 100] * pts
+    # Primary detector, with the other one as fallback. band_top returns nothing
+    # over the approach's bridge stub, where the monotonic clamp then froze the last
+    # six points ~15px below the art; ride_top reads that stretch fine.
+    first = band_top if how == 'band' else ride_top
+    other = ride_top if how == 'band' else band_top
+    raw = []
+    for i in range(pts):
+        x = min(w - 1, round(i * (w - 1) / (pts - 1)))
+        v = first(a, x)
+        raw.append(v if v is not None else other(a, x))
+    v = np.array([np.nan if r is None else r / a.shape[0] * 100 for r in raw])
+    out = v.copy()
+    for i in range(len(v)):                       # median-3: kill lone outliers
+        win = v[max(0, i - 1):i + 2]; win = win[~np.isnan(win)]
+        if len(win): out[i] = float(np.median(win))
+    good = out[~np.isnan(out)]
+    out = np.where(np.isnan(out), np.median(good), out)
+    if mono == 'up':     out = np.minimum.accumulate(out)   # climbing: y only falls
+    elif mono == 'down': out = np.maximum.accumulate(out)   # easing: y only rises
+    return list(out)
+
+
 def build_gorge():
     """Convert the Broken Bridge plates and MEASURE what the runtime needs.
 
