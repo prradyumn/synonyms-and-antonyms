@@ -12,6 +12,12 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 #bg,#bg2{position:absolute;inset:0;background-size:cover;background-position:center}
 #bg2{opacity:0;transition:opacity 1s}
 #fx,#air{position:absolute;inset:0;pointer-events:none}
+#air{z-index:7}          /* above the world, below the HUD and the dialogue bar */
+/* The camera's scale lives here. A transform makes this a stacking context, so the
+   layers' own z-indexes are scoped to it -- which is why the HUD and the bar have to
+   sit OUTSIDE, or they would zoom with the scenery. Origin is a percentage so a
+   resize needs no recalculation. */
+#stage{position:absolute;inset:0;z-index:1;transform-origin:50% 66%;will-change:transform}
 /* parallax layers. .pxb sits behind the rider, .pxf in front of him. */
 .pxb,.pxf{position:absolute;left:0;background-repeat:repeat-x;pointer-events:none;will-change:transform}
 #hud{position:absolute;left:0;right:0;top:0;height:calc(96 * var(--u));display:flex;align-items:center;gap:calc(15 * var(--u));padding:0 calc(31 * var(--u));background:linear-gradient(rgba(255,255,255,.84),rgba(255,255,255,.4));z-index:8}

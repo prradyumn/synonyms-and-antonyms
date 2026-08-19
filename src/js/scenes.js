@@ -38,7 +38,7 @@ function pxBuild(f0,segs,mid,laps){
  BG.style.backgroundImage='none';      /* far_sky is opaque and covers the frame */
  const layer=(cls,z,css)=>{
   const d=el('<div class="'+cls+'"></div>');
-  d.style.cssText='z-index:'+z+';'+css;F.appendChild(d);return d};
+  d.style.cssText='z-index:'+z+';'+css;STAGE.appendChild(d);return d};
  PXBACK.forEach(([k,rate])=>rig.push({el:layer('pxb',1,
   'top:0;height:100%;background-image:url('+A[k]+')'),rate:rate,tile:1}));
  /* between the canopy (0.50) and the action plane (1.00), so it reads as nearer
@@ -124,7 +124,7 @@ function yAt(track,p){
    walk cycle to fit a box cut for the narrower idle. */
 function mkActor(modes,defKey,rider){
  const w=el('<div class="cyc"><div class="cycsh"></div><img></div>');
- F.appendChild(w);
+ STAGE.appendChild(w);
  const o={w:w,img:w.querySelector('img'),x:0,y:0,f:1,modes:modes,base:modes[defKey]};
  /* `rider` marks who the wheel loop belongs to */
  o.riding=on=>{w.classList.toggle('riding',!!on);
@@ -476,14 +476,27 @@ function gorge(){
    rig.setF(f);J.place(HOLD_X,yOf(f));
   },()=>{
    J.show('still');J.riding(0);tone(430,.12);
-   later(()=>ask('Oh no! The bridge is broken.','jhu','wow'),260);
-   later(()=>ask('Two planks are missing. I cannot ride across that.','jhu','think'),260+LINE);
+   /* The one push in the game so far, and it earns it: this is the first obstacle,
+      and the gap has to become the SUBJECT before any words arrive. Wide, it is one
+      thing among a ravine, two rims and a tree.
+
+      It starts after a beat of stillness -- a dead stop following sustained parallax
+      is itself a strong attention cue, and the zoom lands on top of it rather than
+      competing. The origin sits between him and the gap, and slightly above the
+      deck, so the drop opens up as it closes in.
+
+      Then it releases before the game screen, so the handover starts from a neutral
+      frame rather than mid-move. */
+   later(()=>camTo(1.15,900,50,62),300);
+   later(()=>ask('Oh no! The bridge is broken.','jhu','wow'),700);
+   later(()=>ask('Two planks are missing. I cannot ride across that.','jhu','think'),700+LINE);
+   later(()=>camTo(1,700),700+LINE*2-200);
    later(()=>{
     if(armed){armed=0;F.appendChild(el('<div class="over card"><h3>The Broken Bridge</h3>'
      +'<p>The word game goes here.<br>Two planks to mend, two words to find.</p>'
      +'<button class="btn">Back to the start</button></div>'));
      F.querySelector('.btn').onclick=()=>title();}
-   },260+LINE*2+400);
+   },700+LINE*2+500);
   });
  });
  fon('pointerdown',()=>{});

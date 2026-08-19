@@ -1,7 +1,7 @@
 /* DOM references, timers, audio, and small helpers. */
 
 
-const $=s=>document.querySelector(s),F=$('#frame'),BG=$('#bg'),BG2=$('#bg2'),FX=$('#fx'),AIR=$('#air');
+const $=s=>document.querySelector(s),F=$('#frame'),BG=$('#bg'),BG2=$('#bg2'),FX=$('#fx'),AIR=$('#air'),STAGE=$('#stage');
 
 [...Object.values(A),...Object.values(IDLE)].forEach(u=>{const i=new Image();i.src=u});
 
@@ -123,8 +123,29 @@ function noFace(){const b=$('#face');if(b){b.hidden=true;PFACE=null;
  b.querySelectorAll('img').forEach(i=>i.removeAttribute('src'))}}
 function el(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function svg(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
-function clean(){GEN++;kill();RELAY=null;foff();noFace();stopSnd('bike');FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
+function clean(){GEN++;kill();RELAY=null;foff();noFace();camReset();stopSnd('bike');FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
 function setbg(k){BG.style.backgroundImage='url('+A[k]+')'}
+
+/* ---- camera scale ----
+   A push in is a strong signal, so it is used sparingly: it means "this is the
+   thing". Everything in #stage scales about `ox,oy`, given in percentages of the
+   frame, so the rider can be held still while the world grows around him.
+
+   1.15 is about the ceiling. The plates are 1920 wide and render at 1476 on a
+   desktop frame, so scale up to 1.30 is still downsampling and costs nothing -- but
+   on a full-width 1920 frame there is no headroom at all, and past ~1.2 the art
+   softens visibly. Re-export the plates larger before going beyond that.
+
+   Honours prefers-reduced-motion by simply not moving. */
+function camReset(){if(STAGE){STAGE.style.transform='';STAGE.style.transformOrigin='50% 66%'}}
+function camTo(z,ms,ox,oy,after){
+ if(!STAGE)return;
+ if(ox!==undefined)STAGE.style.transformOrigin=ox+'% '+oy+'%';
+ const m=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const from=+(STAGE.style.transform.match(/scale\(([\d.]+)\)/)||[0,1])[1];
+ if(m||!ms){STAGE.style.transform='scale('+z+')';if(after)after();return}
+ tween(ms,p=>{STAGE.style.transform='scale('+(from+(z-from)*easeOut(p))+')'},after);
+}
 /* parent lets a character be mounted inside a scrolling parallax layer, so it
    travels with the world instead of being pinned to the frame */
 function chip(kind,side,parent){const c=el('<img class="ch '+kind+'" src="'+(IDLE[kind]||A[kind])+'" style="'+side+'">');(parent||F).appendChild(c);return c}

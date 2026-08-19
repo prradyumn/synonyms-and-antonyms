@@ -10,6 +10,10 @@
 <div id="wrap">
 <div id="frame">
   <div id="bg"></div><div id="bg2"></div><div id="fx"></div>
+  <!-- #stage holds the world: parallax layers and actors, and nothing else.
+       Camera scale is applied here, so the dialogue bar and the HUD never move
+       with it -- which is the whole reason for the wrapper. -->
+  <div id="stage"></div>
   <div id="hud"><span class="sp"></span>
     <button id="mute" class="q" title="sound on/off"><svg viewBox="0 0 100 100"><path d="M20 38h16l20-16v56L36 62H20z" fill="currentColor"/><path class="on" d="M66 34a22 22 0 0 1 0 32M77 23a37 37 0 0 1 0 54" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path class="off" d="M66 36l30 28M96 36l-30 28" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg></button></div>
   <div id="ask"><div id="face" hidden><img><img class="out" hidden></div><button id="spk"><svg viewBox="0 0 100 100"><path d="M20 38h16l20-16v56L36 62H20z" fill="currentColor"/><path d="M66 34a22 22 0 0 1 0 32M77 23a37 37 0 0 1 0 54" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg></button><span id="asktxt"></span></div>
