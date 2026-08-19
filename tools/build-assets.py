@@ -5,7 +5,7 @@
     python3 tools/build-assets.py
 """
 from PIL import Image
-import numpy as np, pathlib, sys
+import numpy as np, pathlib, sys, math
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC, BG, CH = ROOT/'assets/source', ROOT/'assets/bg', ROOT/'assets/chars'
@@ -198,13 +198,21 @@ def build_wheelie():
           f'height x{h / (src_h / 2):.4f} of the cycle box')
 
 
-EXPR_SRC = 'assets/chars/expressions/full_frames'
-# Off until the pack is re-exported. The delivered frames carry a 12px feather
-# across the seam that cross-dissolves each new mouth into the original's open
-# one, leaving a ghosted smear over the jaw -- measurable in the raw art, where
-# every frame converges to the base over rows 274-280. Nothing here can undo a
-# blend that is already baked in. Flip this back on with the new export.
-EXPR_READY = False
+EXPR_SRC = 'assets/chars/expressions/head_layers'
+EXPR_READY = True
+# The export baked a 12px alpha ramp across the seam, which cross-dissolved each
+# new mouth into the original's open mouth and left a ghosted smear over the jaw
+# -- 3.4px of it at the size he actually renders. That turned out to be
+# recoverable: the ramp is entirely in the head layer's ALPHA and it is exactly
+# linear (255 at y=268 falling to 21 at y=279), so dividing it back out restores
+# their unblended art.
+#
+# Removing it completely is wrong too. The ramp was hiding the fact that their
+# ears and trunks are cut off where the layer ends, and at 0px those become hard
+# flat edges -- more obvious than the ghost was. 3px keeps the cut antialiased
+# while putting the dissolve at 0.85px on screen, comfortably sub-pixel.
+EXPR_FEATHER_IN = 12
+EXPR_FEATHER_OUT = 3
 EXPR = ['still_proud', 'still_think', 'still_wow', 'still_ask',
         'still_cheer', 'still_confused', 'still_encourage']
 EXPR_SEAM = 280          # in the delivered 662x880 space; 140 at game resolution
@@ -224,78 +232,214 @@ def warm(im, upto):
     return m, s[m].mean(), v[m].mean()
 
 
+def tuft(im, upto=240):
+    """The blue hair tuft: pixel area and centroid. The registration landmark.
+
+    Pupils were the obvious choice and they do not work. An eyelid changes how much
+    of a pupil shows, so half-lidded and squeezed-shut expressions measure small or
+    vanish entirely, and no shape test separates a lidded pupil from a shut eye --
+    both are thin crescents. The tuft is the only large feature on this character
+    that expression cannot touch. `upto` keeps the mask clear of the blue collar at
+    his neck.
+
+    Area rather than width, because the hair is drawn with slightly different
+    spread from frame to frame -- 140-157px wide by 75-95px tall -- and sqrt(area)
+    is less sensitive to that than either dimension on its own."""
+    a = np.array(im).astype(int)
+    R, B, A = a[..., 0], a[..., 2], a[..., 3]
+    m = (A > 200) & (B - R > 50) & (B > 110)
+    m[upto:] = False
+    ys, xs = np.where(m)
+    if len(xs) < 200:
+        return None
+    return float(len(xs)), (float(xs.mean()), float(ys.mean()))
+
+
+def align(head, area, mid, ref_area, ref_mid):
+    """Resample a head so its tuft matches the original's in size and position.
+
+    This is the repair the whole set needed. Measured against the original, every
+    delivered head is 80-90% of its size and sits 39-56px lower, and they vary
+    among themselves too -- so on one fixed body the head visibly shrinks, grows
+    and slides as the expression changes. That is not something compositing can
+    hide; the art has to be registered.
+
+    Matching the tuft's area fixes the size and its centroid fixes the position,
+    and because all these heads share the character's proportions that also lands
+    each chin roughly where the original's chin is, which is what the seam needs."""
+    sc = math.sqrt(ref_area / area)
+    big = head.resize((max(1, round(head.width * sc)),
+                       max(1, round(head.height * sc))), Image.LANCZOS)
+    out = Image.new('RGBA', head.size, (0, 0, 0, 0))
+    out.paste(big, (round(ref_mid[0] - mid[0] * sc), round(ref_mid[1] - mid[1] * sc)))
+    return out, sc
+
+
+def prep_head(name, src, ref_s, ref_v):
+    """One delivered head layer, un-feathered and colour-corrected, at 2x.
+
+    Order matters: the export's alpha ramp lives at fixed source rows, so it has to
+    come off before align() moves those rows anywhere."""
+    im = Image.open(src / f'{name}_head.png').convert('RGBA')
+    a = np.array(im).astype(float)
+    for y in range(EXPR_SEAM - EXPR_FEATHER_IN, EXPR_SEAM):
+        a[y, :, 3] = np.minimum(255.0, a[y, :, 3] / ((EXPR_SEAM - y) / EXPR_FEATHER_IN))
+    im = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')
+    m, s0, v0 = warm(im, EXPR_SEAM)
+    hsv = np.array(im.convert('RGB').convert('HSV')).astype(float)
+    hsv[..., 1][m] = np.clip(hsv[..., 1][m] * (ref_s / s0), 0, 255)
+    hsv[..., 2][m] = np.clip(hsv[..., 2][m] * (ref_v / v0), 0, 255)
+    rgb = Image.fromarray(hsv.astype(np.uint8), 'HSV').convert('RGB')
+    return Image.merge('RGBA', (*rgb.split(), im.split()[3])), ref_s / s0, ref_v / v0
+
+
 def build_expressions():
-    """Emit ONE headless body plus a head-only overlay per expression.
+    """Bake one full sprite per expression: their head, registered, on OUR body.
 
-    The obvious build -- flatten each delivered frame into its own full sprite --
-    was tried first and rejected on measurement. The delivered frames are our
-    sprite upscaled 2x with a new head, so flattening them means re-encoding the
-    body seven more times; lossy WebP then left 0.3% of body pixels differing by
-    more than 24/255 along the bike outlines, which is a shimmer on a character
-    who is standing still while his face changes. Encoding losslessly fixes that
-    but costs 532KB instead of 207KB.
+    Three repairs, all measured off the art rather than guessed:
 
-    Stacking a transparent head over one shared body file is both exact and
-    smaller: 79KB for the whole set, and the body is literally the same decoded
-    image in every frame because it is the same file.
+      * the 12px export feather is divided back out of the head layer's alpha and a
+        3px one re-applied -- enough to keep their cut-off ears and trunks
+        antialiased, narrow enough (0.85px on screen) not to ghost his mouth;
+      * every head is registered to the original's hair tuft by align(), so it
+        stops shrinking and sliding between expressions;
+      * ear saturation is corrected against the approved still. Hue is spot on
+        across the set, within 1.2 degrees, but three frames came back washed out
+        by up to -0.19.
 
-    The ears drift: hue is spot on across the set (within 1.2 degrees) but
-    saturation is not, and three frames came back noticeably washed out. The
-    correction is measured against the approved still rather than typed in, so it
-    stays right if the pack is ever regenerated."""
+    Full sprites rather than head overlays, because an overlay showed its seam.
+    That means a lossy re-encode of the bike per frame -- 0.3% of body pixels
+    differ by over 24/255 along the outlines -- which the 220ms cross-fade in
+    mkActor().face() absorbs. Rows below the seam are the original file's own
+    pixels, so the bike stays as sharp as the cycling loop it swaps with."""
     src = ROOT / EXPR_SRC
     base_p = CH / 'jhumru_cycle_still.webp'
     if not EXPR_READY:
-        print('skip expressions (EXPR_READY is False -- pack needs re-export)'); return
+        print('skip expressions (EXPR_READY is False)'); return
     if not src.exists() or not base_p.exists():
         print('skip expressions (no pack)'); return
     base = Image.open(base_p).convert('RGBA')
+    base2 = base.resize((662, 880), Image.LANCZOS)
     seam = EXPR_SEAM * base.height // 880
-    total = 0
-
-    body = base.copy()
-    body.paste((0, 0, 0, 0), (0, 0, base.width, seam))
-    dst = CH / 'jhumru_cycle_body.webp'
-    body.save(dst, 'WEBP', quality=88, method=6)
-    total += dst.stat().st_size
-    print('body ', f'{dst.name:24s}', body.size, f'{dst.stat().st_size / 1024:.0f}KB')
-
-    def head_of(im, tag, sat=1.0, val=1.0):
-        nonlocal total
-        h = im.crop((0, 0, im.width, im.height))
-        h.paste((0, 0, 0, 0), (0, seam, im.width, im.height))
-        d = CH / f'face_{tag}.webp'
-        h.save(d, 'WEBP', quality=88, method=6)
-        total += d.stat().st_size
-        print('face ', f'{tag:24s}', h.size, f'sat x{sat:.2f} val x{val:.2f}',
-              f'{d.stat().st_size / 1024:.0f}KB')
-
-    head_of(base, 'neutral')
-
-    ref = Image.open(src / 'jhumru_cycle_still.png').convert('RGBA')
+    ref = Image.open(ROOT / 'assets/chars/expressions/full_frames'
+                     / 'jhumru_cycle_still.png').convert('RGBA')
     _, ref_s, ref_v = warm(ref, EXPR_SEAM)
-    for name in EXPR:
-        p = src / f'{name}.png'
-        if not p.exists():
-            print('skip (missing)', name); continue
-        im = Image.open(p).convert('RGBA')
-        m, s0, v0 = warm(im, EXPR_SEAM)
-        hsv = np.array(im.convert('RGB').convert('HSV')).astype(float)
-        hsv[..., 1][m] = np.clip(hsv[..., 1][m] * (ref_s / s0), 0, 255)
-        hsv[..., 2][m] = np.clip(hsv[..., 2][m] * (ref_v / v0), 0, 255)
-        rgb = Image.fromarray(hsv.astype(np.uint8), 'HSV').convert('RGB')
-        fixed = Image.merge('RGBA', (*rgb.split(), im.split()[3]))
-        head_of(fixed.resize(base.size, Image.LANCZOS),
-                name.replace('still_', ''), ref_s / s0, ref_v / v0)
+    ref_area, ref_mid = tuft(base2)
+    print(f'       original tuft {ref_area:.0f}px at '
+          f'({ref_mid[0]:.0f},{ref_mid[1]:.0f})')
 
-    print(f'       seam y={seam} of {base.height}; total {total / 1024:.0f}KB')
-    print('       NOTE: the seam crosses the OPEN MOUTH, so the lower lip and '
-          'tongue are\n'
-          '       shared by every expression -- closed-mouth variants are not '
-          'possible from\n'
-          '       this pack. A future round would need the seam at y=162, below '
-          'the mouth\n'
-          '       and through the flat blue strap instead.')
+    prepped = []
+    for name in EXPR:
+        if not (src / f'{name}_head.png').exists():
+            print('skip (missing)', name); continue
+        im, ds, dv = prep_head(name, src, ref_s, ref_v)
+        t = tuft(im)
+        prepped.append((name, im, t, ds, dv))
+
+    med = float(np.median([q[2][0] for q in prepped if q[2]]))
+    total = 0
+    for name, im, t, ds, dv in prepped:
+        area, mid = t if t else (med, ref_mid)
+        head, sc = align(im, area, mid, ref_area, ref_mid)
+
+        # the short feather goes on AFTER the transform, at the destination seam
+        a = np.array(head).astype(float)
+        for y in range(EXPR_SEAM - EXPR_FEATHER_OUT, EXPR_SEAM):
+            a[y, :, 3] *= (EXPR_SEAM - y) / EXPR_FEATHER_OUT
+        a[EXPR_SEAM:, :, 3] = 0
+        head = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA') \
+                    .resize(base.size, Image.LANCZOS)
+
+        out = base.copy()
+        out.paste((0, 0, 0, 0), (0, 0, base.width, seam - 2))
+        out.alpha_composite(head)
+        tag = name.replace('still_', '')
+        dst = CH / f'still_{tag}.webp'
+        out.save(dst, 'WEBP', quality=88, method=6)
+        total += dst.stat().st_size
+        print('face ', f'{tag:12s}', f'tuft {area:5.0f} -> x{sc:.3f}',
+              f'sat x{ds:.2f}', f'{dst.stat().st_size / 1024:.0f}KB'
+              + ('' if t else '   (no tuft -- median)'))
+    print(f'       seam y={seam}, feather {EXPR_FEATHER_IN}->{EXPR_FEATHER_OUT}px, '
+          f'heads registered to the tuft, total {total / 1024:.0f}KB')
+
+
+# Dialogue portraits. Framed to end ABOVE row 280, where the delivered head art
+# stops -- so nothing is composited and there is no seam to go wrong. That is the
+# whole reason this works where the on-bike route does not: registering a head to
+# the original's size pushes its chin down through row 280, and there is no art
+# below that to meet the body with. A portrait has no body, so the circle can
+# simply be framed above the problem.
+PORT_PX   = 320
+# A circle inscribed in a square masks away ~21% of it at the corners, so the box
+# has to be looser than the head or the mask clips his hair and ear tips. Framed on
+# the tuft, which registration has already pinned, so one box suits all eight.
+PORT_SIDE   = 300
+PORT_CENTRE = (330, 150)     # of the 662x880 registered canvas
+PORT_FADE   = 16             # rows of soft edge at each head's own bottom
+
+
+def build_portraits():
+    """Circular dialogue portraits: the head alone, registered, no body.
+
+    Registration is what makes this work. Every head is tuft-aligned first, so one
+    crop box frames all eight identically and the face cannot jump between lines --
+    and with no body in frame there is nothing to join, so none of the seam
+    problems that killed the on-bike route can arise.
+
+    The bottom edge needs care. Registering a head scales it about the tuft, which
+    moves the row its art stops at -- by up to 26px -- so the soft edge is measured
+    per head rather than applied at a fixed row. Fading at row 280 for all of them
+    faded empty space and left the real edge hard, which is exactly what it looked
+    like."""
+    src = ROOT / EXPR_SRC
+    base_p = CH / 'jhumru_cycle_still.webp'
+    if not src.exists() or not base_p.exists():
+        print('skip portraits (no pack)'); return
+    base2 = Image.open(base_p).convert('RGBA').resize((662, 880), Image.LANCZOS)
+    ref = Image.open(ROOT / 'assets/chars/expressions/full_frames'
+                     / 'jhumru_cycle_still.png').convert('RGBA')
+    _, ref_s, ref_v = warm(ref, EXPR_SEAM)
+    ref_area, ref_mid = tuft(base2)
+
+    # neutral is head-only too, so it is framed like the rest rather than being the
+    # one portrait with a shirt in it
+    neutral = base2.copy()
+    neutral.paste((0, 0, 0, 0), (0, EXPR_SEAM, 662, 880))
+    heads = [('neutral', neutral)]
+    for name in EXPR:
+        if not (src / f'{name}_head.png').exists():
+            continue
+        im, _, _ = prep_head(name, src, ref_s, ref_v)
+        t = tuft(im)
+        heads.append((name.replace('still_', ''),
+                      align(im, *(t if t else (ref_area, ref_mid)), ref_area, ref_mid)[0]))
+
+    side = PORT_SIDE
+    x0 = PORT_CENTRE[0] - side // 2
+    y0 = PORT_CENTRE[1] - side // 2
+    yy, xx = np.mgrid[0:PORT_PX, 0:PORT_PX]
+    disc = np.clip((PORT_PX / 2 - 1 - np.hypot(xx - PORT_PX / 2, yy - PORT_PX / 2)) / 1.6, 0, 1)
+    ground = Image.new('RGBA', (PORT_PX, PORT_PX), (238, 243, 232, 255))
+    total = 0
+    for tag, head in heads:
+        a = np.array(head).astype(float)
+        rows = np.where((a[..., 3] > 12).any(axis=1))[0]
+        foot = int(rows.max())                      # THIS head's own bottom edge
+        for i in range(PORT_FADE):
+            y = foot - PORT_FADE + 1 + i
+            if 0 <= y < a.shape[0]:
+                a[y, :, 3] *= 1 - (i + 1) / PORT_FADE
+        head = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')
+        cut = head.crop((x0, y0, x0 + side, y0 + side)).resize((PORT_PX, PORT_PX), Image.LANCZOS)
+        out = ground.copy(); out.alpha_composite(cut)
+        q = np.array(out).astype(float); q[..., 3] *= disc
+        dst = CH / f'port_{tag}.webp'
+        Image.fromarray(q.clip(0, 255).astype(np.uint8), 'RGBA')              .save(dst, 'WEBP', quality=90, method=6)
+        total += dst.stat().st_size
+        print('port ', f'{tag:12s}', f'foot row {foot:3d}', f'{dst.stat().st_size / 1024:.0f}KB')
+    print(f'       {PORT_PX}px circles, box x{x0} y{y0} side {side}, '
+          f'total {total / 1024:.0f}KB')
 
 
 def build_ramp():

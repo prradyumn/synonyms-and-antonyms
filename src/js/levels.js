@@ -14,19 +14,29 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
 /* Idle breathing loop, used wherever Jhumru just stands there. */
 const IDLE={ele:'assets/chars/jhumru_idle.webp'};
 
-/* PARKED -- expression overlays for the stopped bicycle. Empty on purpose.
+/* Dialogue portraits -- a face beside the speech text, not a swap on the bike.
 
-   The art is drawn and the poses are right, but it was exported with a 12px
-   feather across the seam, which cross-dissolves each new mouth into the
-   original's open mouth and leaves a ghosted horizontal smear over the jaw. It is
-   baked into the delivered pixels (the raw frames converge to the base over rows
-   274-280), so no compositing here can undo it. Waiting on a re-EXPORT, not a
-   redraw -- see docs/13-expression-frames.md.
+   Swapping his head on the bicycle was tried twice and abandoned. The delivered
+   heads are drawn at 80-90% of the original's size and sit up to 28px low, so
+   unregistered they shrink and slide as the expression changes; and registering
+   them to the right size pushes the chin down through row 280, where the art
+   simply stops, leaving a cut with the original's chin under it. There is no
+   composite that satisfies both.
 
-   The machinery below it stays live: mkActor().face(k) reads this map, so filling
-   it in is the only change needed when the frames land. Every HOOK line already
-   carries its face key. */
-const FACES={};
+   A portrait needs no body, so the circle is framed to end above row 280 and
+   nothing is joined at all. Every head is registered on the blue hair tuft first,
+   so one crop box frames all eight identically and the face never jumps.
+   build_portraits() in tools/build-assets.py. */
+const PORTRAIT={
+ neutral  :'assets/chars/port_neutral.webp',
+ proud    :'assets/chars/port_proud.webp',
+ think    :'assets/chars/port_think.webp',
+ wow      :'assets/chars/port_wow.webp',
+ ask      :'assets/chars/port_ask.webp',
+ cheer    :'assets/chars/port_cheer.webp',
+ confused :'assets/chars/port_confused.webp',
+ encourage:'assets/chars/port_encourage.webp'
+};
 
 /* Jhumru's sprite modes. Every entry declares its own box aspect and its own
    rear-wheel anchor as a fraction of that box, because the wheelie frames sit on
@@ -53,9 +63,9 @@ const RIDER={
    in order and the pause sizes itself to fit, so lines can be added or cut here
    without touching scenes.js.
    ------------------------------------------------------------------------- */
-/* `face` names an entry in FACES and holds for the rest of the stop unless a later
-   line changes it. Narrator lines carry one too, because he is still on screen
-   being talked about. */
+/* `face` names an entry in PORTRAIT. It holds until another line changes it, so a
+   stop only needs to name an expression when it turns. Narrator lines carry one
+   too -- he is on screen being talked about. */
 const HOOK={
  /* stop 1 -- the near bank, he introduces himself and his bicycle */
  bank:[{who:'nar',line:'Jhumru was setting off on an exciting adventure through the jungle on his new bicycle.',face:'neutral'},

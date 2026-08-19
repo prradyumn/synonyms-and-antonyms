@@ -99,14 +99,9 @@ function yAt(track,p){
    sized for its widest sprite -- object-fit:contain would otherwise shrink a wide
    walk cycle to fit a box cut for the narrower idle. */
 function mkActor(modes,defKey,rider){
- /* Three layers: the body sprite, the face on it, and one spare face slot that the
-    outgoing expression fades out through. */
- const w=el('<div class="cyc"><div class="cycsh"></div><img>'
-           +'<img class="face" hidden><img class="face out" hidden></div>');
+ const w=el('<div class="cyc"><div class="cycsh"></div><img></div>');
  F.appendChild(w);
- const im=w.querySelectorAll('img');
- const o={w:w,img:im[0],f1:im[1],f2:im[2],fk:'neutral',x:0,y:0,f:1,
-          modes:modes,base:modes[defKey]};
+ const o={w:w,img:w.querySelector('img'),x:0,y:0,f:1,modes:modes,base:modes[defKey]};
  /* `rider` marks who the wheel loop belongs to */
  o.riding=on=>{w.classList.toggle('riding',!!on);
   if(rider){if(on)play('bike');else stopSnd('bike')}};
@@ -115,31 +110,8 @@ function mkActor(modes,defKey,rider){
  /* how far the rear wheel sits from the box centre, in px. The ramp needs this:
     his position along the slope is where the WHEEL is, not where the box is. */
  o.wheelDX=()=>{const b=o.base,bCW=U(b.hu)*b.ar;return (b.ax-0.5)*bCW};
- /* Which head he wears. Kept across mode changes, so a stop can set the
-    expression once and the cycling and wheelie sprites -- which carry their own
-    heads -- just ignore it until he stops again.
-
-    Expressions CROSS-FADE rather than cut. A hard swap between two heads on an
-    otherwise motionless character is a pop the eye goes straight to; 220ms of
-    dissolve reads as him changing his mind. It runs on VT like everything else,
-    so it pauses with the game. */
- o.face=k=>{
-  if(!k||!FACES[k]||k===o.fk)return;
-  const was=o.f1.getAttribute('src'),m=o.m||o.base;
-  o.fk=k;
-  if(!m.face||!was||o.f1.hidden){o.dress();return}   /* riding, or nothing shown yet */
-  o.f2.src=was;o.f2.hidden=false;o.f2.style.opacity='1';
-  o.f1.src=FACES[k];                                 /* the new head, underneath */
-  tween(220,p=>{o.f2.style.opacity=String(1-p)},
-        ()=>{o.f2.hidden=true;o.f2.removeAttribute('src')});
- };
- /* Only the `still` mode is headless, and it is never drawn without a face. */
- o.dress=()=>{const m=o.m||o.base;
-  o.f2.hidden=true;
-  if(m.face&&FACES[o.fk]){o.f1.src=FACES[o.fk];o.f1.hidden=false}
-  else o.f1.hidden=true};
  o.show=k=>{const m=o.modes[k];if(!m||m===o.m)return;
-  o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.dress();o.layout()};
+  o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.layout()};
  o.layout=()=>{
   const m=o.m||o.base;
   o.CH=U(m.hu);o.CW=Math.round(o.CH*m.ar);
@@ -302,23 +274,20 @@ function hook(){
  fon('pointerdown',skip);
  const done=()=>intro();
 
- /* Faces are preloaded with everything else: a face arriving late would show a
-    frame of the wrong expression. Harmless while FACES is empty. */
+ /* Portraits preload with the plates: one arriving late would show the wrong
+    expression for a frame, or none at all. */
  Promise.all(['far_sky','mid_canopy','act_bank','act_bridge','act_clearing','cyc','cycs']
-  .map(k=>A[k]).concat(Object.values(FACES))
+  .map(k=>A[k]).concat(Object.values(PORTRAIT))
   .map(u=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=u})))
   .then(()=>{if(g===GEN)roll()});
 
- /* Built by roll() once the plates are in; say() needs it to change his face, and
-    say() lives out here so the script drives the timings. */
- let J=null;
+ let J=null;                    /* built by roll() once the plates are in */
  /* Plays one stop of HOOK. Each line carries its own voice and optional cue, and
     the stop's length falls out of how many lines it has -- so the script can grow
     or shrink in levels.js without touching any timing here. */
  const say=(lines,t0)=>{
   lines.forEach((l,i)=>later(()=>{
-   ask(l.line,l.who);
-   if(l.face)J.face(l.face);
+   ask(l.line,l.who,l.face);
    if(l.fx==='bell')play('bell');
    if(l.fx==='map')trailMap();
    if(l.fx==='ask')askToCome();
