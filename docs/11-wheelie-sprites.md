@@ -135,8 +135,10 @@ as the reference every single time.
 
 ```
 Match the attached reference image EXACTLY: the same grey cartoon elephant in
-blue dungarees and a blue-and-white cap, on the same small red bicycle, in the
-same flat 2D cartoon style, same palette, same line weight, same proportions.
+blue dungarees over a white T-shirt, with a spiky blue-and-white tuft of HAIR on
+top of his head (not a cap, not a helmet), orange ears and a maroon trunk tip, on
+the same small red-orange bicycle, in the same flat 2D cartoon style, same
+palette, same line weight, same proportions.
 This is the SAME character on the SAME bike -- not a redesign.
 
 Side view, facing RIGHT. Full body. Isolated on a plain flat mid-grey background
