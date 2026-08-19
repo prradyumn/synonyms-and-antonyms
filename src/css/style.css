@@ -49,12 +49,6 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 /* object-fit so swapping between sprites of DIFFERENT aspect (idle 0.54 vs walk
    0.70) never stretches them; bottom-anchored so the feet stay on the ground. */
 .cyc img{display:block;position:relative;z-index:1;width:100%;height:100%;object-fit:contain;object-position:50% 100%;transform-origin:50% 50%}
-/* Speed streaks for the bike: flat rounded bars in the art's own idiom, trailing
-   backwards and fading. They live inside .cyc, so scaleX flips them with him, and
-   only run while .riding is set -- never while he is stopped. */
-.cyc .dash{position:absolute;height:calc(10 * var(--u));border-radius:999px;opacity:0;
- background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.9));pointer-events:none}
-.cyc.riding .dash{animation:dashgo .5s linear infinite}
 .cycsh{position:absolute;left:13%;bottom:-1%;width:74%;height:9%;border-radius:50%;background:radial-gradient(closest-side,rgba(34,22,8,.5),rgba(34,22,8,.2),rgba(34,22,8,0))}
 .vine{position:absolute;left:0;right:0;bottom:calc(244 * var(--u));height:calc(48 * var(--u));z-index:5;pointer-events:none}
 .ramp{position:absolute;z-index:2;pointer-events:none}
@@ -75,7 +69,6 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 .over h3{margin:0;font-size:calc(55 * var(--u));color:#1B3324}
 .over p{margin:0;font-size:calc(32 * var(--u));color:#5E6A5C;line-height:1.55;max-width:calc(1178 * var(--u))}
 .btn{border:none;background:#2F8F4E;color:#fff;font-weight:700;font-size:calc(35 * var(--u));padding:calc(31 * var(--u)) calc(65 * var(--u));border-radius:calc(31 * var(--u));cursor:pointer;box-shadow:0 calc(9 * var(--u)) 0 #1E6236}
-@keyframes dashgo{0%{transform:translateX(0) scaleX(.45);opacity:0}
  22%{opacity:.95}70%{opacity:.5}
  100%{transform:translateX(calc(-104 * var(--u))) scaleX(1.3);opacity:0}}
 /* % of #frame's own box -- #frame can't resolve the cqw in --u against itself */

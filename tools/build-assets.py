@@ -198,6 +198,32 @@ def build_wheelie():
           f'height x{h / (src_h / 2):.4f} of the cycle box')
 
 
+def build_ramp():
+    """Convert the ramp plate to WebP and MEASURE its surface.
+
+    The rider follows the ramp's real curve rather than a straight line between
+    two guessed waypoints, so the profile has to come off the art. Printed here
+    as a ready-to-paste array: surface height as a fraction of the ramp's own box,
+    sampled left (foot) to right (crest)."""
+    src = SRC / 'px_ramp.png'
+    if not src.exists():
+        print('skip ramp (no assets/source/px_ramp.png)'); return
+    im = Image.open(src).convert('RGBA')
+    w, h = im.size
+    im.save(BG / 'ramp.webp', 'WEBP', quality=86, method=4, exact=True)
+    print('ramp ', (w, h), f'aspect {w / h:.3f}',
+          f'{(BG / "ramp.webp").stat().st_size / 1024:.0f}KB')
+    a = np.array(im)[:, :, 3]
+    n = 16
+    prof = []
+    for k in range(n + 1):
+        x = min(w - 1, round(k / n * (w - 1)))
+        col = np.where(a[:, x] > 40)[0]
+        prof.append(round(float(col.min()) / h, 4) if len(col) else 1.0)
+    print('       RAMP_PROFILE=[' + ','.join(f'{v:.4f}' for v in prof) + '];')
+    print(f'       foot {prof[0]:.3f} -> crest {prof[-1]:.3f} of its own height')
+
+
 def build_join_trunk():
     """A trunk to lay OVER each act-layer segment join.
 
@@ -322,6 +348,7 @@ def main():
     build_parallax()
     build_audio()
     build_wheelie()
+    build_ramp()
     for key, (fn, h, dur) in LOOPS.items():
         p = CH / fn
         if not p.exists():

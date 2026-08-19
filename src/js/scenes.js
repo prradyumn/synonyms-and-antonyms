@@ -94,19 +94,18 @@ function yAt(track,p){
 /* An actor positioned in PERCENTAGES, so a resize just re-places it. Its box is
    sized for its widest sprite -- object-fit:contain would otherwise shrink a wide
    walk cycle to fit a box cut for the narrower idle. */
-function mkActor(modes,defKey,streaks){
- /* three streaks at different heights, widths and phases so they read as motion
-    rather than as a repeating pattern. Trail left, behind a right-facing rider. */
- const dash=streaks?[[52,64,0],[66,44,.17],[78,54,.33]].map(([top,wid,delay])=>
-  '<div class="dash" style="top:'+top+'%;width:'+wid+'%;left:-'+(wid*0.75)+'%;'
-  +'animation-delay:'+delay+'s"></div>').join(''):'';
- const w=el('<div class="cyc">'+dash+'<div class="cycsh"></div><img></div>');
+function mkActor(modes,defKey,rider){
+ const w=el('<div class="cyc"><div class="cycsh"></div><img></div>');
  F.appendChild(w);
  const o={w:w,img:w.querySelector('img'),x:0,y:0,f:1,modes:modes,base:modes[defKey]};
+ /* `rider` marks who the wheel loop belongs to */
  o.riding=on=>{w.classList.toggle('riding',!!on);
-  if(streaks){if(on)play('bike');else stopSnd('bike')}};
+  if(rider){if(on)play('bike');else stopSnd('bike')}};
  /* Switch sprite set. Box size and anchor come from the mode, so a wider wheelie
     canvas does not move him. */
+ /* how far the rear wheel sits from the box centre, in px. The ramp needs this:
+    his position along the slope is where the WHEEL is, not where the box is. */
+ o.wheelDX=()=>{const b=o.base,bCW=U(b.hu)*b.ar;return (b.ax-0.5)*bCW};
  o.show=k=>{const m=o.modes[k];if(!m||m===o.m)return;
   o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.layout()};
  o.layout=()=>{
@@ -170,44 +169,66 @@ const GROUND1=77.5,DECK=65.6,GROUND3=86;
    Leg B is the ride off it: a shorter take-off ramp on the deck itself.
 
    RAMP_*_RISE is the single source of truth for each -- it sets both the crest in
-   the Y track and the ramp's drawn height, so the two cannot drift apart and
-   leave him floating over the lip. Width follows from a 0.40 rise:run. */
+   the rider's height and the ramp's drawn height, so the two cannot drift apart
+   and leave him floating over the lip. */
 const RAMP_A_RISE=GROUND1-DECK, RAMP_A_TIP=0.70;   /* fraction along leg A */
 const RAMP_B_RISE=10.5,          RAMP_B_TIP=0.30;   /* fraction along leg B */
+const RAMP_AR=2.5;                                  /* the plate is 5:2 */
 
-const LEG_A_Y=[[0,GROUND1],[.55,GROUND1],[RAMP_A_TIP,DECK],[1,DECK]];
-const LEG_B_Y=[[0,DECK],[.17,DECK],[RAMP_B_TIP,DECK-RAMP_B_RISE],[.40,DECK-RAMP_B_RISE],
-               [.50,DECK],[.60,GROUND3],[1,GROUND3]];
-/* [leg fraction, sprite] -- lift before the ramp, hold over it, land coming off */
-const WHEELIE_A=[[0,'cyc'],[.47,'lift'],[.56,'hold'],[.72,'land'],[.82,'cyc']];
-const WHEELIE_B=[[0,'cyc'],[.17,'lift'],[.26,'hold'],[.42,'land'],[.52,'cyc']];
-/* and the body tilt that goes with each */
-const TILT_A=[[0,0],[.47,0],[.58,-14],[.70,-14],[.82,0],[1,0]];
-const TILT_B=[[0,0],[.17,0],[.30,-14],[.42,-14],[.52,0],[1,0]];
-
-/* A take-off ramp in the act layer, so it scrolls with the world. topY is the
-   height its crest reaches; it descends `rise` from there to its base. */
-function putRamp(rig,tipCam,topY,rise){
- const Fh=F.clientHeight,rh=rise/100*Fh,rw=Math.round(rh/0.40),rp=svg(rampSVG());
- rp.style.cssText='position:absolute;width:'+rw+'px;height:'+Math.round(rh)+'px;'
-  +'left:'+(tipCam*rig.span+HOLD_X/100*F.clientWidth-rw*0.94)+'px;'
-  /* bed it into the surface rather than perching on its top edge */
-  +'top:'+(topY/100*Fh+Fh*0.015)+'px;z-index:2';
- rig.act.appendChild(rp);return rp;
+/* Surface height as a fraction of the ramp's own box, MEASURED off
+   assets/bg/ramp.webp by build_ramp() -- foot on the left, crest on the right.
+   The rider follows this rather than a straight line between two guessed
+   waypoints, which is what makes the wheels sit on the planks. Re-run the build
+   and paste this again if the ramp art changes. */
+const RAMP_PROFILE=[0.9688,0.8850,0.8462,0.8037,0.7588,0.7113,0.6613,0.6075,
+                    0.5525,0.4938,0.4325,0.3688,0.3013,0.2300,0.1550,0.0775,0.0000];
+function rampSurface(u){
+ const n=RAMP_PROFILE.length-1,t=Math.min(1,Math.max(0,u))*n,i=Math.floor(t);
+ return i>=n?RAMP_PROFILE[n]:RAMP_PROFILE[i]+(RAMP_PROFILE[i+1]-RAMP_PROFILE[i])*(t-i);
 }
-/* Steps the rider through a wheelie table as p advances and tilts him with the
-   ramp. Returns the per-frame call. */
-function wheelieRun(J,table,tiltTrack){
+
+/* A ramp in the act layer, so it scrolls with the world. Its box IS the ramp:
+   bottom edge on the surface below, top edge the crest. Returns the geometry the
+   rider needs to walk its profile. */
+function putRamp(rig,tipCam,crestY,rise){
+ const Fw=F.clientWidth,Fh=F.clientHeight;
+ const rh=rise/100*Fh,rw=Math.round(rh*RAMP_AR);
+ const rp=el('<img class="ramp" src="'+A.ramp+'">');
+ rp.style.cssText='position:absolute;width:'+rw+'px;height:'+Math.round(rh)+'px;'
+  +'left:'+(tipCam*rig.span+HOLD_X/100*Fw-rw*0.94)+'px;'
+  +'top:'+(crestY/100*Fh)+'px;z-index:2';
+ rig.act.appendChild(rp);
+ /* his position along the ramp, 0 at the foot and 1 at the crest. It is placed so
+    he is 94% along it at tipCam, which is where the crest sits. */
+ const wCam=rw/rig.span;
+ return {crestY:crestY,rise:rise,baseY:crestY+rise,
+         /* dx shifts u by the rider's wheel offset, so u==0 is the wheel at the
+            foot of the ramp rather than the sprite's box centre */
+         u:(camF,dx)=>(camF-tipCam)/wCam+0.94+(dx||0)/rw,
+         y:u=>crestY+rampSurface(u)*rise,
+         footCam:tipCam-0.94*wCam, crestCam:tipCam+0.06*wCam, wCam:wCam,
+         dxCam:dx=>(dx||0)/rig.span};
+}
+/* Steps the rider through the wheelie as he crosses a ramp, and tilts him with
+   the slope. Beats are derived from the ramp's own geometry rather than typed in,
+   so moving the ramp moves them with it. */
+function wheelieRun(J,r,legOf){
+ /* shifted by the same wheel offset, so the lift happens as the WHEEL reaches
+    the foot rather than as the sprite's centre does */
+ const sh=r.dxCam(J.wheelDX());
+ const lift=legOf(r.footCam-sh)-0.05, foot=legOf(r.footCam-sh),
+       crest=legOf(r.crestCam-sh), done=legOf(r.crestCam-sh)+0.10;
+ const table=[[0,'cyc'],[lift,'lift'],[foot,'hold'],[crest,'land'],[done,'cyc']];
+ const tilt=[[0,0],[lift,0],[foot,-14],[crest,-14],[done,0],[1,0]];
  let mode='';
  return p=>{
   for(let i=table.length-1;i>=0;i--)if(p>=table[i][0]){
    if(mode!==table[i][1]){mode=table[i][1];J.show(mode);
     if(mode==='lift')tone(520,.10);if(mode==='land')tone(300,.14)}
    break}
-  J.img.style.transform='rotate('+yAt(tiltTrack,p).toFixed(1)+'deg)';
+  J.img.style.transform='rotate('+yAt(tilt,p).toFixed(1)+'deg)';
  };
 }
-
 
 function hook(){
  clean();
@@ -277,11 +298,14 @@ function hook(){
   later(()=>{
    say(HOOK.legA,0);                                 /* spoken as he pedals off */
    J.show('cyc');J.riding(1);
-   putRamp(rig,RAMP_A_TIP*.5,DECK,RAMP_A_RISE);      /* the climb onto the bridge */
-   const runA=wheelieRun(J,WHEELIE_A,TILT_A);
-   tween(LEG,p=>{rig.setF(p*.5);J.place(HOLD_X,yAt(LEG_A_Y,p));runA(p)},
-         ()=>{J.img.style.transform=''});
-  },t);
+   const rA=putRamp(rig,RAMP_A_TIP*.5,DECK,RAMP_A_RISE);   /* onto the bridge */
+   const runA=wheelieRun(J,rA,c=>c/.5);
+   tween(LEG,p=>{
+    rig.setF(p*.5);
+    const u=rA.u(p*.5,J.wheelDX());
+    J.place(HOLD_X,u<=0?GROUND1:u>=1?DECK:rA.y(u));
+    runA(p);
+   },()=>{J.img.style.transform=''});  },t);
   t+=LEG;
 
   /* ---- stop 2: he stops midspan and speaks, alone ---- */
@@ -291,11 +315,19 @@ function hook(){
   /* ---- leg B: both travel on to the clearing ---- */
   later(()=>{
    J.show('cyc');J.riding(1);
-   putRamp(rig,.5+RAMP_B_TIP*.5,DECK-RAMP_B_RISE,RAMP_B_RISE);
-   const runB=wheelieRun(J,WHEELIE_B,TILT_B);
-   tween(LEG,p=>{rig.setF(.5+p*.5);J.place(HOLD_X,yAt(LEG_B_Y,p));runB(p)},
-         ()=>{J.img.style.transform=''});
-  },t);
+   const rB=putRamp(rig,.5+RAMP_B_TIP*.5,DECK-RAMP_B_RISE,RAMP_B_RISE);
+   const runB=wheelieRun(J,rB,c=>(c-.5)/.5);
+   const offP=(rB.crestCam-.5)/.5;                   /* leg fraction at the lip */
+   tween(LEG,p=>{
+    rig.setF(.5+p*.5);
+    const u=rB.u(.5+p*.5,J.wheelDX());
+    let y;
+    if(u<=0)y=DECK; else if(u<1)y=rB.y(u);
+    else{const q=Math.min(1,(p-offP)/(0.80-offP));   /* off the lip, down to the clearing */
+         y=rB.crestY+(GROUND3-rB.crestY)*q}
+    J.place(HOLD_X,y);
+    runB(p);
+   },()=>{J.img.style.transform=''});  },t);
   t+=LEG;
 
   /* ---- stop 3: the clearing, and Monty arrives from the right ---- */

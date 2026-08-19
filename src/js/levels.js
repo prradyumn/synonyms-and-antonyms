@@ -3,7 +3,7 @@
 
 /* Only what the opening loads. The six location plates are parked -- see
    docs/12-level-content-parked.md -- and come back with one build run. */
-const A={map:'assets/bg/map.webp',
+const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
          far_sky:'assets/bg/far_sky.webp',mid_canopy:'assets/bg/mid_canopy.webp',
          near_leaves:'assets/bg/near_leaves.webp',near_grass:'assets/bg/near_grass.webp',
          join_trunk:'assets/bg/join_trunk.webp',act_bank:'assets/bg/act_bank.webp',act_bridge:'assets/bg/act_bridge.webp',act_clearing:'assets/bg/act_clearing.webp',
