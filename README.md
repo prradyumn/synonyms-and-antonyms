@@ -30,7 +30,6 @@ src/css/style.css          all styles, including the keyframe animations
 src/js/levels.js           ← EDIT HERE for word pairs and story lines
 src/js/engine.js           DOM refs, timers, speech, tones, helpers
 src/js/sprites.js          runtime SVG: signpost, vine, word tags, sparkles
-src/js/fx.js               after-state effects (glow, fruit, water)
 src/js/scenes.js           the scenes: hook, intro, map, level, ending
 src/js/main.js             boot
 
@@ -51,6 +50,7 @@ docs/08-four-option-mechanics.md        getting to four options without four tim
 docs/09-mechanic-visual-prompts.md      prompts to SEE the four-option mechanics before building
 docs/10-immersive-scene-playbook.md      REUSABLE — ideation + parallax/bg prompt packages for any game
 docs/11-wheelie-sprites.md              wheelie-over-a-ramp: sprites to commission, and what to derive
+docs/12-level-content-parked.md         the word bank, kept while the level mechanic is redesigned
 
 prototypes/v1-tap-to-answer.html      earlier version, tap only
 prototypes/v2-carry-the-word.html     same as src/, single-file, base64
@@ -249,69 +249,25 @@ Neither blocks the opening, but both are one edit of `act_clearing`:
 
 ---
 
-## How a level works
+## Scope right now
 
-Everything lives in one array in `src/js/levels.js`:
+**Finalised:** the title tap, the whole opening — bank → ramp + wheelie onto the
+bridge → the trail map → ramp + wheelie off it → the clearing, Monty walking in,
+the "Will you come?" choice — and the resting shot of the three friends.
 
-```js
-{
-  bg: 'bridge_broken',      // key into the A asset map
-  after: 'bridge_fixed',    // second plate to crossfade to, or null
-  fx: null,                 // 'glow' | 'fruit' | 'water' | 'cheer' | null
-  say: 'mon',               // who says the word
-  hear: 'ele',              // who doesn't understand
-  w: 'broken',              // the word on the signpost
-  syn: 'smashed',           // correct answer
-  ant: 'fixed',             // wrong: opposite meaning
-  un: 'noisy',              // wrong: unrelated
-  ok:   '...',              // spoken on success
-  antL: '...',              // spoken when the antonym is chosen
-  unL:  '...'               // spoken when the unrelated word is chosen
-}
-```
+**Everything past that has been removed.** The map screen, the six locations, the
+three-tile level mechanic, the ending and the gates prototype were all built
+against a mechanic `docs/07` and `docs/08` replace, so they are gone from `src/`
+rather than left rotting.
 
-Every round offers exactly one synonym, one antonym and one unrelated word, shuffled. That is the whole item design, and it makes each attempt diagnostic — **which** wrong answer a child reaches for says more than whether they were right.
+- **The word content is not lost.** It sits verbatim in
+  `docs/12-level-content-parked.md`, with the reasoning in `docs/05`.
+- **The location plates are not lost.** They are still in `assets/source/`, and
+  `tools/build-assets.py` still lists them, so one run brings all eight back into
+  `assets/bg/`.
 
-**To add a level:** append an object to `L`, add its background to `assets/bg/` and register the path in the `A` map at the top of the same file. Then add a seventh entry to `POCK` in `src/js/scenes.js` for the map pin position (percentages of frame width and height).
-
----
-
-## Interaction
-
-Pull a word tag off the vine and drag it to the friend on the right. Release past 58% of the frame width and it flies.
-
-- **Synonym** → arcs across, lands, ring pulses, sparkles, scene transforms
-- **Antonym** → travels most of the way, then gets handed back
-- **Unrelated** → tumbles out of frame, and a fresh tag grows back on the vine
-
-**Tap also works.** A press-and-release under 14px of movement resolves as a tap. Keep this. Drag is error-prone for six-year-olds, so it's the reward for children who can manage it, never a barrier.
-
-Nothing is ever lost on a wrong answer. No red cross, no lives, no timer, no score. This is deliberate — see `docs/01`.
-
----
-
-## What's placeholder
-
-| Thing | State |
-|---|---|
-| Background resolution | Sources are only **1672×941**, so 1920 output is a ~15% upscale. `bg_river_deep` is a 1086×1448 portrait and fares worst. Re-export the sources at 1920+ to recover real detail |
-| `bridge_broken` → `bridge_fixed` | Real painted pair ✅ |
-| `river_deep` → `river_shallow` | Near-pair, deep is centre-cropped from a portrait plate |
-| Cave lit / tree laden / falls flowing | **CSS overlays in `fx.js`** — need real second plates |
-| Rock wall resolved | **No transformation at all.** Currently just a cheer. Weakest level |
-| Characters | Monty and Jhumru breathe everywhere. **Tez has no idle loop** and stands still. No talk/understand/confused states yet |
-| Voice | Browser speech synthesis, standing in for recorded Indian-English VO |
-| Signpost, vine, tags | Runtime SVG. Fine to keep — cheap and scales cleanly |
-
----
-
-## Next steps, in order
-
-1. **Character animation.** `idle` is done for Monty and Jhumru. Still needed: **an idle loop for Tez**, then `talk`, `understand` and `confused` for all three — read `docs/02`. The code already fires those moments; they just render as stills. To add one, drop the raw GIF in `assets/chars/`, add a line to `LOOPS` in `tools/build-assets.py`, run it, and reference the output. Recommendation in the doc is skeletal (Rive) over sprite sheets for characters, sprite sheets for effects.
-2. **The three missing after-plates.** `docs/03` has ready-to-paste prompts. Cave lit, tree laden, falls flowing.
-3. **A real transformation for the rock wall**, or swap that location out.
-4. **Record the VO.** Human, Indian English, not TTS. When the word being taught is the word being mispronounced, the cost is higher than usual.
-5. **Playtest with 6–8 children** before any of the above gets expensive. Watch specifically whether the two wrong-answer animations read as *information* or as *failure* — the whole no-fail design rests on that.
+Levels return with a new mechanic — see `docs/08` for the four-option options and
+`docs/09` for prompts to mock them up before building.
 
 ---
 
@@ -320,6 +276,6 @@ Nothing is ever lost on a wrong answer. No red cross, no lives, no timer, no sco
 - Landscape 16:9 to match the background art. If you need portrait, the backgrounds must be repainted, not cropped.
 - `assets/bg/` and `assets/chars/` are entirely derived. Change `W, H` or `CHAR_H` or `LOOPS` in `tools/build-assets.py` and re-run rather than editing them by hand.
 - No build step on purpose. Plain scripts in load order, no modules, so `file://` works.
-- Load order in `index.html` matters: `levels → engine → sprites → fx → scenes → main`.
+- Load order in `index.html` matters: `levels → engine → sprites → scenes → main`.
 - `assets/chars/*.gif` with spaces in the name are raw 1920×1080 exports, not game assets. `tools/build-assets.py` crops them; only the cropped output is loaded.
 - `assets/source/` holds the full-resolution originals. Don't delete them — everything in `assets/bg/` and `assets/chars/` is derived and regenerable, those aren't.

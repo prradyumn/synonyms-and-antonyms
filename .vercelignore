@@ -4,6 +4,7 @@
 # out of the deployment takes it from ~45MB to ~6MB.
 assets/source/
 assets/chars/*.gif
+assets/chars/wheelie/
 tools/
 docs/
 prototypes/

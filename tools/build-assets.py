@@ -112,21 +112,31 @@ def build_audio():
     out.mkdir(parents=True, exist_ok=True)
     jobs = [
         # (input, output, filter, codec args)   levels measured, not guessed
+        # mono at 64k: a background ambience at 0.065 volume gains nothing from
+        # stereo or a higher bitrate, and it halves the biggest single asset
         ('raw_jungle_loop.mp3', 'jungle_loop.mp3', 'loudnorm=I=-14:TP=-1.0:LRA=9',
-         ['-codec:a', 'libmp3lame', '-b:a', '112k']),
+         ['-ac', '1', '-codec:a', 'libmp3lame', '-b:a', '64k']),
         ('raw_bike_loop.ogg', 'bike_loop.ogg', 'volume=3.2,alimiter=limit=0.85',
          ['-codec:a', 'libvorbis', '-q:a', '4']),
         ('raw_step.ogg', 'step.ogg', 'volume=16.0,alimiter=limit=0.9',
          ['-codec:a', 'libvorbis', '-q:a', '4']),
-        ('raw_bell.ogg', 'bell.ogg', 'volume=2.2,alimiter=limit=0.85',
-         ['-codec:a', 'libvorbis', '-q:a', '4']),
+        # The source is a ROTATING bell -- a continuous trill, not a ding. The
+        # script says "Tring! Tring!", so take the attack, fade it, and lay two
+        # copies 430ms apart to make two distinct rings out of one recording.
+        ('raw_bell.ogg', 'bell.ogg', None,
+         ['-filter_complex',
+          '[0:a]atrim=0:0.30,asetpts=N/SR/TB,afade=t=out:st=0.17:d=0.13[d];'
+          '[d]asplit=2[d1][d2];[d2]adelay=430:all=1[d2d];'
+          '[d1][d2d]amix=inputs=2:normalize=0,volume=2.4,alimiter=limit=0.85[o]',
+          '-map', '[o]', '-codec:a', 'libvorbis', '-q:a', '4']),
     ]
     for src, dst, filt, codec in jobs:
         p_in = raw / src
         if not p_in.exists():
             print('skip (missing)', src); continue
-        subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', str(p_in),
-                        '-af', filt] + codec + [str(out / dst)], check=True)
+        pre = ['-af', filt] if filt else []      # filt None -> codec carries -filter_complex
+        subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', str(p_in)]
+                       + pre + codec + [str(out / dst)], check=True)
         print('audio', dst, f'{(out / dst).stat().st_size / 1024:.0f}KB')
 
 

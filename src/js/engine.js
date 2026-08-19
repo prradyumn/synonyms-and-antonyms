@@ -1,11 +1,11 @@
 /* DOM references, timers, audio, and small helpers. */
 
 
-const $=s=>document.querySelector(s),F=$('#frame'),BG=$('#bg'),BG2=$('#bg2'),FX=$('#fx'),AIR=$('#air'),PIPS=$('#pips');
+const $=s=>document.querySelector(s),F=$('#frame'),BG=$('#bg'),BG2=$('#bg2'),FX=$('#fx'),AIR=$('#air');
 
 [...Object.values(A),...Object.values(IDLE),...Object.values(WALK)].forEach(u=>{const i=new Image();i.src=u});
 
-let shells=0,streak=0,GEN=0,T=[],cur=0;const kept=[];
+let GEN=0,T=[];
 
 
 
@@ -102,7 +102,6 @@ $('#mute').onclick=()=>{
 function ask(t,who){$('#asktxt').textContent=t;speak(t,who)}
 function el(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function svg(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
-function pips(){PIPS.innerHTML='';L.forEach((_,k)=>PIPS.appendChild(el('<span class="pip'+(k<cur?' on':'')+'"></span>')))}
 function clean(){GEN++;kill();RELAY=null;foff();stopSnd('bike');FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
 function setbg(k){BG.style.backgroundImage='url('+A[k]+')'}
 /* parent lets a character be mounted inside a scrolling parallax layer, so it
