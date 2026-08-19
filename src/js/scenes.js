@@ -12,7 +12,13 @@ const PXBACK=[['far_sky',0.20],['mid_canopy',0.50]];
 const PXFRONT=[['near_leaves',1.40,'top',169],['near_grass',1.40,'bottom',236]];
 const SEG=['act_bank','act_bridge','act_clearing'];
 
-function pxBuild(f0){
+/* `segs` names the act-layer plates; it defaults to the opening's three. `mid` adds
+   ONE extra positioned layer between the canopy and the action plane -- the gorge
+   interior, which has to travel slower than the deck so that what shows through the
+   hole in the bridge slides more slowly than the hole does. That differential IS
+   the depth effect; matched rates would look painted on. */
+function pxBuild(f0,segs,mid){
+ segs=segs||SEG;
  /* The camera is a FRACTION of total travel (0 = bank, .5 = bridge, 1 = clearing),
     never a pixel count. Every pixel is recomputed from the live frame width by
     layout(), so a resize cannot leave the layers and the riders disagreeing about
@@ -25,8 +31,13 @@ function pxBuild(f0){
   d.style.cssText='z-index:'+z+';'+css;F.appendChild(d);return d};
  PXBACK.forEach(([k,rate])=>rig.push({el:layer('pxb',1,
   'top:0;height:100%;background-image:url('+A[k]+')'),rate:rate,tile:1}));
- const act=layer('pxb',1,'top:0;height:100%');
- const segs=SEG.map(k=>{
+ /* between the canopy (0.50) and the action plane (1.00), so it reads as nearer
+    than the horizon treeline and further than the bridge */
+ const gorge=mid?layer('pxb',1,'top:0;height:100%;background-repeat:no-repeat;'
+  +'background-size:100% 100%;background-image:url('+A[mid.key]+')'):null;
+ if(gorge)rig.push({el:gorge,rate:mid.rate,wide:mid.wide||segs.length});
+ const act=layer('pxb',2,'top:0;height:100%');
+ const plates=segs.map(k=>{
   const g=el('<div></div>');
   g.style.cssText='position:absolute;top:0;height:100%;background-size:100% 100%;'
    +'background-repeat:no-repeat;background-image:url('+A[k]+')';
@@ -34,7 +45,7 @@ function pxBuild(f0){
  /* One trunk laid over each segment join. Both plates carry a full-height edge
     trunk, so where two segments butt you get two HALF trunks on a hard vertical
     edge plus a tonal step; one trunk spanning the join reads as scenery. */
- const joins=SEG.slice(1).map(()=>{
+ const joins=segs.slice(1).map(()=>{
   const t=el('<div></div>');
   t.style.cssText='position:absolute;top:0;height:100%;background-size:100% 100%;'
    +'background-repeat:no-repeat;background-image:url('+A.join_trunk+')';
@@ -42,20 +53,20 @@ function pxBuild(f0){
  rig.push({el:act,rate:1});
  PXFRONT.forEach(([k,rate,edge,h])=>rig.push({el:layer('pxf',6,
   edge+':0;background-image:url('+A[k]+')'),rate:rate,tile:1,strip:h}));
- rig.act=act;rig.segs=segs;rig.f=f0||0;
+ rig.act=act;rig.segs=plates;rig.n=segs.length;rig.f=f0||0;
 
  rig.layout=()=>{
   const Fw=Math.round(F.clientWidth);
-  rig.span=Fw*(SEG.length-1);          /* total camera travel, in px */
+  rig.span=Fw*(segs.length-1);         /* total camera travel, in px */
   rig.forEach(o=>{
    if(o.tile){
     o.el.style.width=(Fw*4)+'px';
     o.el.style.backgroundSize=(Fw*2)+'px 100%';
     if(o.strip)o.el.style.height=Math.round(Fw*o.strip/1920)+'px';
-   } else o.el.style.width=(Fw*SEG.length)+'px';
+   } else o.el.style.width=(Fw*(o.wide||segs.length))+'px';
   });
   /* 1px wider than a frame so neighbours overlap rather than risk a hairline gap */
-  segs.forEach((g,i)=>{g.style.left=(i*Fw)+'px';g.style.width=(Fw+1)+'px'});
+  plates.forEach((g,i)=>{g.style.left=(i*Fw)+'px';g.style.width=(Fw+1)+'px'});
   joins.forEach((t,i)=>{
    const tw=Math.round(Fw*230/1920);
    t.style.left=((i+1)*Fw-tw/2)+'px';t.style.width=tw+'px'});
@@ -270,9 +281,9 @@ function hook(){
  clean();window.__scene='hook';
  const g=GEN;
 
- function skip(){intro()}                 /* clean() drops the listener for us */
+ function skip(){gorge()}                 /* clean() drops the listener for us */
  fon('pointerdown',skip);
- const done=()=>intro();
+ const done=()=>gorge();
 
  /* Portraits preload with the plates: one arriving late would show the wrong
     expression for a frame, or none at all. */
@@ -310,7 +321,7 @@ function hook(){
   c.querySelector('.btn').onclick=e=>{
    e.stopPropagation();c.remove();
    say(HOOK.go,0);
-   later(intro,Math.max(LINE,HOOK.go.length*LINE)+200);
+   later(gorge,Math.max(LINE,HOOK.go.length*LINE)+200);
   };
  }
 
@@ -390,14 +401,66 @@ function hook(){
 }
 
 
-/* ---------- intro ----------
-   The clearing, camera parked where the opening left it and everyone standing
-   where they stopped, so the handoff is a continuation rather than a cut. */
-function intro(){
- clean();window.__scene='intro';
- const rig=pxBuild(1),bt='bottom:'+(100-GROUND3)+'%';
- RELAY=()=>rig.layout();
- chip('ele','left:'+HOLD_X+'%;'+bt).classList.add('px');
- /* the script already said 'Let us go', so this is just the instruction */
- ask('The trail starts here. More of it soon.','nar');
+/* ---------- the broken bridge ----------
+   The first hurdle. He rides out of the clearing, up the approach, onto the span,
+   and stops short of the gap. A game screen takes over from there.
+
+   The world is three NEW act plates, but the sky, canopy and both fringe strips are
+   the same files as the opening -- so this reads as the same jungle further along
+   rather than as a new place, and it costs nothing. The one addition is mid_gorge
+   between the canopy and the action plane: the ravine interior, seen through the
+   hole in the deck and under the whole span.
+
+   His height comes from GORGE.prof, measured off the plates, so he follows the
+   drawn path over its dip and up to the rim instead of a straight line between
+   guessed waypoints. Same approach as the ramp. */
+function gorge(){
+ clean();window.__scene='gorge';
+ const rig=pxBuild(0,GORGE.seg,{key:'mid_gorge',rate:GORGE.midRate});
+ const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
+ RELAY=()=>{rig.layout();J.layout()};
+
+ const n=GORGE.seg.length;
+ /* The plates concatenate into one track, so a world fraction indexes straight
+    into it. He sits at HOLD_X of the frame, so his own position runs ahead of the
+    camera by that much. */
+ const track=[];
+ GORGE.prof.forEach((pr,i)=>pr.forEach((y,j)=>
+  track.push([(i+j/(pr.length-1))/n,y])));
+ const worldAt=f=>(f*(n-1)+HOLD_X/100)/n;
+ const yOf=f=>yAt(track,worldAt(f));
+ /* Stop with the gap ahead of him rather than under him: back off GORGE.margin of
+    a plate from the measured near edge. */
+ const stopF=Math.min(1,(GORGE.gap*n-HOLD_X/100-0.14)/(n-1));
+
+ J.place(-12,yOf(0));
+ let armed=1;
+ const RIDE=RIDE_IN*1.1,RUN=LEG*1.9;
+
+ /* ride on from the left */
+ tween(RIDE,p=>{
+  const x=-12+(HOLD_X+12)*easeRide(p);
+  J.place(x,yOf(0));
+ },()=>{
+  J.riding(1);J.show('cyc');
+  /* the long haul: camera and rider off one fraction, so they cannot disagree */
+  tween(RUN,p=>{
+   const f=stopF*easeOut(p);
+   rig.setF(f);J.place(HOLD_X,yOf(f));
+  },()=>{
+   J.show('still');J.riding(0);tone(430,.12);
+   later(()=>ask('Oh no! The bridge is broken.','jhu','wow'),260);
+   later(()=>ask('Two planks are missing. I cannot ride across that.','jhu','think'),260+LINE);
+   later(()=>{
+    if(armed){armed=0;F.appendChild(el('<div class="over card"><h3>The Broken Bridge</h3>'
+     +'<p>The word game goes here.<br>Two planks to mend, two words to find.</p>'
+     +'<button class="btn">Back to the start</button></div>'));
+     F.querySelector('.btn').onclick=()=>title();}
+   },260+LINE*2+400);
+  });
+ });
+ fon('pointerdown',()=>{});
 }
+/* Press B from anywhere to jump straight to the hurdle while it is being built. */
+addEventListener('keydown',e=>{if(e.key==='b'||e.key==='B')gorge()});
+

@@ -9,6 +9,9 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
          join_trunk:'assets/bg/join_trunk.webp',act_bank:'assets/bg/act_bank.webp',act_bridge:'assets/bg/act_bridge.webp',act_clearing:'assets/bg/act_clearing.webp',
          wlift:'assets/chars/wheelie_lift.webp',whold:'assets/chars/wheelie_hold.webp',wland:'assets/chars/wheelie_land.webp',
          cyc:'assets/chars/jhumru_cycle.webp',cycs:'assets/chars/jhumru_cycle_still.webp',
+         g_near:'assets/bg/act_gorge_near.webp',g_span:'assets/bg/act_gorge_span.webp',
+         g_far:'assets/bg/act_gorge_far.webp',mid_gorge:'assets/bg/mid_gorge.webp',
+         plank:'assets/chars/prop_plank.webp',
          ele:'assets/chars/jhumru.webp'};
 
 /* Idle breathing loop, used wherever Jhumru just stands there. */
@@ -36,6 +39,25 @@ const PORTRAIT={
  cheer    :'assets/chars/port_cheer.webp',
  confused :'assets/chars/port_confused.webp',
  encourage:'assets/chars/port_encourage.webp'
+};
+
+const GORGE={
+ seg:['g_near','g_span','g_far'],
+ midRate:0.62,
+ gap:0.4790,        /* the gap's near edge, as a fraction of the whole world */
+ gapPx:[839,1071],      /* measured off the alpha: 233px, not the 192 in their spec */
+ deck:65.28,
+ /* Rideable surface of each plate, 33 points left to right, as a percentage of
+    frame height. Measured off the art by build_gorge() -- see ride_top() for why
+    colour and not opacity. Do not hand-edit; re-run the build. */
+ prof:[
+  /* act_gorge_near */
+  [75.09,79.54,75.09,74.81,75.09,76.94,76.94,79.72,81.30,81.67,81.67,81.67,81.67,81.67,80.74,80.00,79.81,78.70,77.78,76.85,75.46,74.35,72.96,71.57,70.37,69.07,68.15,67.41,66.30,66.30,66.02,66.16,66.02],
+  /* act_gorge_span */
+  [64.88,64.88,64.88,64.88,65.19,65.28,65.28,65.28,65.28,65.28,65.37,65.37,65.37,65.37,65.68,65.68,65.68,65.68,65.14,65.28,65.28,65.28,65.28,65.28,65.19,65.19,65.19,65.19,65.09,64.88,64.88,64.88,64.88],
+  /* act_gorge_far */
+  [64.81,64.86,64.81,64.91,64.91,64.91,64.91,64.91,64.91,64.91,65.19,66.67,66.67,66.67,66.39,66.39,66.11,66.39,66.39,63.52,63.52,62.31,62.31,67.96,68.15,68.24,68.43,68.43,68.52,69.63,69.63,69.63,69.63]
+ ]
 };
 
 /* Jhumru's sprite modes. Every entry declares its own box aspect and its own

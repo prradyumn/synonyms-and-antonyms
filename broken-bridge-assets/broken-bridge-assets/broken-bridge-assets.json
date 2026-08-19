@@ -1,0 +1,37 @@
+{
+  "canvas": [
+    1920,
+    1080
+  ],
+  "deckSurfaceY": 706,
+  "deckUndersideY": 772,
+  "gap": {
+    "left": 864,
+    "right": 1056,
+    "width": 192
+  },
+  "midGorgeCanvas": [
+    5760,
+    1080
+  ],
+  "midGorgeTopTransparentPx": 324,
+  "layers": [
+    {
+      "file": "png/act_gorge_near.png",
+      "rate": 1.0
+    },
+    {
+      "file": "png/act_gorge_span.png",
+      "rate": 1.0
+    },
+    {
+      "file": "png/act_gorge_far.png",
+      "rate": 1.0
+    },
+    {
+      "file": "png/mid_gorge.png",
+      "rate": 0.42
+    }
+  ],
+  "prop": "png/prop_plank.png"
+}

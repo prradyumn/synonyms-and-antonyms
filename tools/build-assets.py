@@ -442,6 +442,99 @@ def build_portraits():
           f'total {total / 1024:.0f}KB')
 
 
+GORGE_SRC = 'broken-bridge-assets/broken-bridge-assets/png'
+GORGE_ACT = ['act_gorge_near', 'act_gorge_span', 'act_gorge_far']
+
+
+def ride_top(a, x, run=14, need=10, y_from=280):
+    """Top of the RIDEABLE surface in column x -- ochre earth or plank wood.
+
+    Two cheaper tests were tried and both fail on a full scene plate. Topmost
+    opaque finds the rope handrail, an 8px band 40px above the deck. Topmost solid
+    body finds tree canopy, which on the far plate sits at 26% and put the profile
+    240px above the path. Colour is what separates the surface from everything
+    standing on or above it: the path is warm ochre and the deck is warm plank,
+    while the foliage is green and the rock is grey. Same approach that found the
+    bank's path height for the opening.
+
+    `need` of the next `run` rows must match too, so a warm pixel inside a leaf
+    cluster cannot be mistaken for ground."""
+    col = a[:, x]
+    R, G, B, A = col[:, 0], col[:, 1], col[:, 2], col[:, 3]
+    warm = (A > 200) & (R > 135) & (R - B > 45) & (G < R * 0.92) & (G > R * 0.38)
+    for y in range(y_from, a.shape[0] - run):
+        if warm[y] and warm[y:y + run].sum() >= need:
+            return y
+    return None
+
+
+def build_gorge():
+    """Convert the Broken Bridge plates and MEASURE what the runtime needs.
+
+    Three things are measured rather than taken from the delivered JSON, because
+    the drawing is what the rider has to sit on:
+
+      * the rideable surface profile of each plate, so his height follows the art
+        the way it follows the ramp;
+      * the real gap edges from the alpha -- the splintered plank ends run back
+        further than the nominal 864-1056, so the true opening is wider;
+      * the deck height either side of each plate join, to catch a step."""
+    src = ROOT / GORGE_SRC
+    if not src.exists():
+        print('skip gorge (no plates)'); return
+    prof = {}
+    for name in GORGE_ACT + ['mid_gorge']:
+        p_in = src / f'{name}.png'
+        if not p_in.exists():
+            print('skip (missing)', name); continue
+        im = Image.open(p_in).convert('RGBA')
+        dst = BG / f'{name}.webp'
+        im.save(dst, 'WEBP', quality=76, method=6)
+        print('gorge', f'{name:16s}', im.size, f'{dst.stat().st_size / 1024:.0f}KB')
+        if name in GORGE_ACT:
+            a = np.array(im).astype(int)
+            prof[name] = [ride_top(a, min(im.width - 1, round(i * im.width / 16)))
+                          for i in range(17)]
+    pl = src / 'prop_plank.png'
+    if pl.exists():
+        im = Image.open(pl).convert('RGBA')
+        im.save(CH / 'prop_plank.webp', 'WEBP', quality=88, method=6)
+        print('gorge', f'{"prop_plank":16s}', im.size,
+              f'{(CH / "prop_plank.webp").stat().st_size / 1024:.0f}KB')
+
+    print('\n       SURFACE PROFILE (fraction of frame height, 17 points L->R)')
+    for name, ys in prof.items():
+        txt = ','.join('null' if y is None else f'{y / 1080:.4f}' for y in ys)
+        print(f'       {name}\n         [{txt}]')
+
+    span = np.array(Image.open(src / 'act_gorge_span.png').convert('RGBA')).astype(int)
+    deck = ride_top(span, 400)
+    row = span[deck + 6, :, 3] > 8
+    runs, st = [], None
+    for x in range(span.shape[1]):
+        if not row[x] and st is None: st = x
+        elif row[x] and st is not None:
+            if x - st > 40: runs.append((st, x - 1))
+            st = None
+    print(f'\n       deck surface y={deck} ({deck / 1080 * 100:.1f}%); '
+          f'gap in the alpha: {runs}')
+    if runs:
+        g0, g1 = runs[0]
+        print(f'       -> GAP {g0}-{g1} = {g1 - g0 + 1}px ({100 * g0 / 1920:.1f}%'
+              f'-{100 * g1 / 1920:.1f}%), delivered spec said 864-1055 (192px)')
+
+    print('\n       JOINS (deck/ground height either side)')
+    for i in range(len(GORGE_ACT) - 1):
+        A = np.array(Image.open(src / f'{GORGE_ACT[i]}.png').convert('RGBA')).astype(int)
+        B = np.array(Image.open(src / f'{GORGE_ACT[i + 1]}.png').convert('RGBA')).astype(int)
+        ea = [v for v in (ride_top(A, x) for x in range(A.shape[1] - 24, A.shape[1])) if v]
+        eb = [v for v in (ride_top(B, x) for x in range(0, 24)) if v]
+        if ea and eb:
+            print(f'       {GORGE_ACT[i]} y{np.mean(ea):.0f} -> '
+                  f'{GORGE_ACT[i + 1]} y{np.mean(eb):.0f}   '
+                  f'step {np.mean(eb) - np.mean(ea):+.0f}px')
+
+
 def build_ramp():
     """Convert the ramp plate to WebP and MEASURE its surface.
 
