@@ -7,6 +7,41 @@
 <link rel="stylesheet" href="src/css/style.css">
 </head>
 <body>
+<!-- Water ripple. A gaussian blur only softens; what reads as WAVY is a turbulence
+     field displacing the pixels, so this is feTurbulence driving feDisplacementMap.
+     Inline SVG, no library, works offline. The band is stretched horizontally
+     (baseFrequency x much lower than y) because a river's ripples are long and flat,
+     and the filter is static -- the water texture SCROLLS THROUGH it, which is what
+     makes the distortion look alive without re-computing the noise every frame. -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+ <filter id="ripple" x="-4%" y="-25%" width="108%" height="150%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.004 0.045" numOctaves="2" seed="11" result="n">
+   <!-- Animating the noise makes the ripple field itself undulate, so the surface
+        is alive even when nothing is scrolling. SMIL, which needs no JS and no
+        library. -->
+   <animate attributeName="baseFrequency" dur="8s" repeatCount="indefinite"
+            values="0.004 0.052;0.006 0.070;0.0045 0.044;0.004 0.052"/>
+  </feTurbulence>
+  <feDisplacementMap in="SourceGraphic" in2="n" scale="11" xChannelSelector="R" yChannelSelector="G">
+   <animate attributeName="scale" dur="4.5s" repeatCount="indefinite" values="16;26;12;16"/>
+  </feDisplacementMap>
+ </filter>
+ <!-- Static twin of #ripple, for the sheen. The sheen already travels fast enough
+      to read, so animating its noise as well bought nothing and cost 15fps. -->
+ <filter id="rippleStatic" x="-4%" y="-25%" width="108%" height="150%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.004 0.05" numOctaves="2" seed="19" result="n"/>
+  <feDisplacementMap in="SourceGraphic" in2="n" scale="18" xChannelSelector="R" yChannelSelector="G"/>
+ </filter>
+ <filter id="rippleFar" x="-4%" y="-25%" width="108%" height="150%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.006 0.07" numOctaves="2" seed="4" result="n">
+   <animate attributeName="baseFrequency" dur="19s" repeatCount="indefinite"
+            values="0.006 0.07;0.007 0.062;0.006 0.07"/>
+  </feTurbulence>
+  <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G">
+   <animate attributeName="scale" dur="6.5s" repeatCount="indefinite" values="7;13;7"/>
+  </feDisplacementMap>
+ </filter>
+</svg>
 <div id="wrap">
 <div id="frame">
   <div id="bg"></div><div id="bg2"></div><div id="fx"></div>

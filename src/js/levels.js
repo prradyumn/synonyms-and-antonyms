@@ -11,7 +11,13 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
          cyc:'assets/chars/jhumru_cycle.webp',cycs:'assets/chars/jhumru_cycle_still.webp',
          g_near:'assets/bg/act_gorge_near.webp',g_span:'assets/bg/act_gorge_span.webp',
          g_far:'assets/bg/act_gorge_far.webp',mid_gorge:'assets/bg/mid_gorge.webp',
-         plank:'assets/chars/prop_plank.webp'};
+         plank:'assets/chars/prop_plank.webp',
+         r_bank:'assets/bg/act_raft_bank.webp',r_open:'assets/bg/act_raft_open.webp',
+         r_far:'assets/bg/act_raft_far.webp',water_far:'assets/bg/water_far.webp',
+         water_near:'assets/bg/water_near.webp',near_reeds:'assets/bg/near_reeds.webp',
+         raft:'assets/chars/raft_fused.webp',raft_bad:'assets/chars/raft_stepped.webp',
+         log_a:'assets/chars/prop_log_smooth.webp',log_b:'assets/chars/prop_log_ridged.webp',
+         log_c:'assets/chars/prop_log_moss.webp',splash:'assets/chars/fx_splash.webp'};
 
 /* The idle breathing loop and the standing sprite are OUT of the shipped set.
    Nothing draws them: chip() was their only consumer and its last call went when
@@ -19,6 +25,21 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
    were 936KB of the 4.5MB boot -- a fifth of it -- fetched every load and never
    shown. `python tools/build-assets.py` regenerates both from the GIFs in
    assets/chars, which stay in git. Add them back to A when a scene needs them. */
+
+/* Expression heads for the stopped pose. Each is the same 458x682 canvas as the
+   body, cropped to ONE shared bbox by build_stills(), so they need no placement of
+   their own and cannot drift apart at runtime.
+
+   The pack arrived as six complete characters -- correct brief -- but from a model
+   rather than a rig, so the rear-wheel contact spanned 18px and the bodies differed
+   by up to 163,000 pixels. Cross-fading those whole would morph the bike. Taking the
+   body from ONE file and swapping only the registered head is what makes the change
+   seamless. */
+const FACES={
+ neutral:'assets/chars/face_neutral.webp', proud:'assets/chars/face_proud.webp',
+ think  :'assets/chars/face_think.webp',   wow  :'assets/chars/face_wow.webp',
+ ask    :'assets/chars/face_ask.webp',     cheer:'assets/chars/face_cheer.webp'
+};
 
 /* Dialogue portraits -- a face beside the speech text, not a swap on the bike.
 
@@ -39,9 +60,7 @@ const PORTRAIT={
  think    :'assets/chars/port_think.webp',
  wow      :'assets/chars/port_wow.webp',
  ask      :'assets/chars/port_ask.webp',
- cheer    :'assets/chars/port_cheer.webp',
- confused :'assets/chars/port_confused.webp',
- encourage:'assets/chars/port_encourage.webp'
+ cheer    :'assets/chars/port_cheer.webp'
 };
 
 const GORGE={
@@ -74,6 +93,56 @@ const GORGE={
  ]
 };
 
+const RAFT={
+ /* act_raft_open is deliberately an empty spacer. It arrived painted as a full
+    background, but the far side of the river already has a treeline from mid_canopy
+    at 0.50 and a reed line from water_far at 0.62 -- anything left on the action
+    plane there would travel at 1.00 and read as the far bank rushing past a raft
+    that is barely moving. */
+ seg:['r_bank','r_open','r_far'],
+
+ /* The depth stack. water_near travels FASTER than the raft, so it passes in front
+    of the hull and cuts the waterline: that is what makes him float IN the water
+    rather than on a painting of it. Against water_far's 0.62 it gives a 2:1 spread
+    across the river, which is the only depth cue an otherwise flat plane has.
+    near_reeds is the fastest layer in the game because on a crossing he barely moves
+    against the far bank, so the foreground has to say "you are travelling".
+    `drift` scrolls each texture on its own, so the river flows while he is parked.
+    The near band moves nearly 3x the far one: measured, at the first values only 0.4%
+    of the water's pixels changed over a second, because water_near is deliberately
+    sparse at 5% coverage and a slow scroll of a sparse texture reads as still. */
+ mids:[{key:'water_far',  rate:0.62,z:1,strip:1080,edge:'bottom',drift:0.016,fx:'rippleFar'},
+       {key:'water_near', rate:1.22,z:6,strip:340, edge:'bottom',drift:0.042,front:1,fx:'ripple',swell:1},
+       /* A SECOND pass of the near band at a different rate and drift. water_near is
+          deliberately sparse -- 5% coverage -- so one copy scrolling reads as almost
+          still; two crossing at different speeds interfere and the surface comes
+          alive without any new art. */
+       {key:'water_near', rate:0.96,z:5,strip:300, edge:'bottom',drift:0.024,op:0.75},
+       /* Sheen: highlight streaks drawn in CSS, no asset.
+
+          The angle is the GRADIENT's direction, not the stripes'. 98deg ran the
+          gradient left-to-right and produced near-VERTICAL lines across the river,
+          which looked like a fence. 6deg runs it bottom-to-top, so the stripes lie
+          near-horizontal as water lines do, tilted just enough that the horizontal
+          drift shifts them visibly -- a line 6 degrees off level moving sideways
+          reads as moving down the river. The ripple filter then bends them. */
+       {rate:1.10,z:5,strip:300,edge:'bottom',drift:0.055,fx:'rippleStatic',swell:1,op:0.42,
+        paint:"repeating-linear-gradient(6deg,"
+             +"rgba(255,255,255,0) 0 22px,rgba(255,255,255,.26) 22px 26px,"
+             +"rgba(255,255,255,0) 26px 54px,rgba(214,244,255,.16) 54px 57px,"
+             +"rgba(255,255,255,0) 57px 92px)"},
+       {key:'near_reeds', rate:1.62,z:7,strip:300, edge:'bottom',front:1}],
+ /* near_grass is dropped for this scene -- grass over open water is wrong. */
+ front:[['near_leaves',1.40,'top',169]],
+
+ /* Measured off act_raft_bank: the ochre shore's top edge, and the row where the
+    plate stops, which is the water's edge. */
+ shore:[[0,61.6],[0.20,60.6],[0.30,62.4],[0.42,66.0]],
+ water:78.4,
+ deck:75.4,        /* the raft's walkable top -- floats 3% proud of the waterline */
+ logsY:66.5        /* where the three logs rest on the shore */
+};
+
 /* Jhumru's sprite modes. Every entry declares its own box aspect and its own
    rear-wheel anchor as a fraction of that box, because the wheelie frames sit on
    a wider canvas than the level-riding ones. Placement anchors on the REAR WHEEL,
@@ -82,7 +151,11 @@ const GORGE={
    paste them again if the frames are ever regenerated. */
 const RIDER={
  cyc  :{url:'assets/chars/jhumru_cycle.webp',      hu:322, ar:331/440, ax:0.290},
- still:{url:'assets/chars/jhumru_cycle_still.webp',hu:322, ar:331/440, ax:0.290},
+ /* The stopped pose is a HEADLESS body plus a face layer, so only the head ever
+    changes and a cross-fade cannot morph the bicycle. hu/ar/ax are printed by
+    build_stills(); hu 348 is derived from the wheel-to-tuft distance so he stays
+    exactly the size he was on the cycling loop when the sprite swaps. */
+ still:{url:'assets/chars/jhumru_still_body.webp',hu:348, ar:0.6716, ax:0.2522, face:1},
  lift :{url:'assets/chars/wheelie_lift.webp',      hu:314, ar:1.0886,  ax:0.409},
  hold :{url:'assets/chars/wheelie_hold.webp',      hu:314, ar:1.0886,  ax:0.409},
  land :{url:'assets/chars/wheelie_land.webp',      hu:314, ar:1.0886,  ax:0.409}

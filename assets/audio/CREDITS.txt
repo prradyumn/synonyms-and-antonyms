@@ -12,6 +12,12 @@ bell.ogg          "Bicycle Sounds" (rotating_bicycle_bell-1) by AntumDeluge -- C
                   https://opengameart.org/content/bicycle-sounds
                   Same pack as bike_loop; used for Jhumru's "Tring! Tring!".
 
+river_loop.mp3    "Sea and river wave sounds" (VistulaShort) -- CC0
+                  https://opengameart.org/content/sea-and-river-wave-sounds
+                  A recording of the Vistula. The source is 5 minutes of 320kbps
+                  stereo (11.7MB); the game uses 24 seconds of it from 40s in, mono
+                  at 56k, loudnorm'd to the same target as the jungle bed.
+
 step.ogg          "Different steps on wood, stone, leaves, gravel and mud"
                   (leaves01) by TinyWorlds -- CC0
                   https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud

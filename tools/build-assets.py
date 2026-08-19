@@ -6,6 +6,7 @@
 """
 from PIL import Image
 import numpy as np, pathlib, sys, math
+from scipy import ndimage
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC, BG, CH = ROOT/'assets/source', ROOT/'assets/bg', ROOT/'assets/chars'
@@ -116,6 +117,13 @@ def build_audio():
         # stereo or a higher bitrate, and it halves the biggest single asset
         ('raw_jungle_loop.mp3', 'jungle_loop.mp3', 'loudnorm=I=-14:TP=-1.0:LRA=9',
          ['-ac', '1', '-codec:a', 'libmp3lame', '-b:a', '64k']),
+        # River ambience for the raft scene. The source is 5 minutes of 320kbps
+        # stereo -- 11.7MB, absurd for a background bed. 24 seconds of it, mono at
+        # 56k, is 170KB and nobody can tell: it plays under dialogue at 0.07 volume.
+        # Cut from 40s in, past the recordist settling, and loudnorm'd to the same
+        # target as the jungle bed so the two ambiences sit at one level.
+        ('raw_river_loop.mp3', 'river_loop.mp3', 'loudnorm=I=-14:TP=-1.0:LRA=9',
+         ['-ss', '40', '-t', '24', '-ac', '1', '-codec:a', 'libmp3lame', '-b:a', '56k']),
         ('raw_bike_loop.ogg', 'bike_loop.ogg', 'volume=3.2,alimiter=limit=0.85',
          ['-codec:a', 'libvorbis', '-q:a', '4']),
         ('raw_step.ogg', 'step.ogg', 'volume=16.0,alimiter=limit=0.9',
@@ -380,236 +388,161 @@ PORT_FADE   = 16             # rows of soft edge at each head's own bottom
 
 
 def build_portraits():
-    """Circular dialogue portraits: the head alone, registered, no body.
+    """Circular dialogue portraits, cropped from the SAME stills the character wears.
 
-    Registration is what makes this work. Every head is tuft-aligned first, so one
-    crop box frames all eight identically and the face cannot jump between lines --
-    and with no body in frame there is nothing to join, so none of the seam
-    problems that killed the on-bike route can arise.
+    One set of art now feeds both, which is what the brief promised: the face beside
+    the text and the face on the bicycle are the same drawing, so they cannot drift
+    apart. The old head-layer pack is no longer read by anything.
 
-    The bottom edge needs care. Registering a head scales it about the tuft, which
-    moves the row its art stops at -- by up to 26px -- so the soft edge is measured
-    per head rather than applied at a fixed row. Fading at row 280 for all of them
-    faded empty space and left the real edge hard, which is exactly what it looked
-    like."""
-    src = ROOT / EXPR_SRC
-    base_p = CH / 'jhumru_cycle_still.webp'
-    if not src.exists() or not base_p.exists():
-        print('skip portraits (no pack)'); return
-    base2 = Image.open(base_p).convert('RGBA').resize((662, 880), Image.LANCZOS)
-    ref = Image.open(ROOT / 'assets/chars/expressions/full_frames'
-                     / 'jhumru_cycle_still.png').convert('RGBA')
-    _, ref_s, ref_v = warm(ref, EXPR_SEAM)
-    ref_area, ref_mid = tuft(base2)
+    Framing is a fixed box for all six -- build_stills() has already registered every
+    head on the tuft and cropped them to one shared bbox, so a single box frames them
+    identically and the face cannot jump between lines."""
+    body_p = CH / 'jhumru_still_body.webp'
+    if not body_p.exists():
+        print('skip portraits (run build_stills first)'); return
+    body = Image.open(body_p).convert('RGBA')
+    tags = [n.replace('still_', '') for n in STILLS]
+    faces = {t: CH / f'face_{t}.webp' for t in tags}
+    if not all(p.exists() for p in faces.values()):
+        print('skip portraits (missing faces)'); return
 
-    # neutral is head-only too, so it is framed like the rest rather than being the
-    # one portrait with a shirt in it
-    neutral = base2.copy()
-    neutral.paste((0, 0, 0, 0), (0, EXPR_SEAM, 662, 880))
-    heads = [('neutral', neutral)]
-    for name in EXPR:
-        if not (src / f'{name}_head.png').exists():
-            continue
-        im, _, _ = prep_head(name, src, ref_s, ref_v)
-        t = tuft(im)
-        heads.append((name.replace('still_', ''),
-                      align(im, *(t if t else (ref_area, ref_mid)), ref_area, ref_mid)[0]))
+    # frame on the tuft, which registration has pinned, and stop above the collar
+    ref = body.copy(); ref.alpha_composite(Image.open(faces['neutral']).convert('RGBA'))
+    _, mid = tuft(ref, upto=int(body.height * 0.45))
+    side = round(body.height * 0.46)
+    x0, y0 = int(mid[0] - side * 0.52), int(mid[1] - side * 0.30)
 
-    side = PORT_SIDE
-    x0 = PORT_CENTRE[0] - side // 2
-    y0 = PORT_CENTRE[1] - side // 2
     yy, xx = np.mgrid[0:PORT_PX, 0:PORT_PX]
     disc = np.clip((PORT_PX / 2 - 1 - np.hypot(xx - PORT_PX / 2, yy - PORT_PX / 2)) / 1.6, 0, 1)
     ground = Image.new('RGBA', (PORT_PX, PORT_PX), (238, 243, 232, 255))
     total = 0
-    for tag, head in heads:
+    for t in tags:
+        head = Image.open(faces[t]).convert('RGBA')
         a = np.array(head).astype(float)
         rows = np.where((a[..., 3] > 12).any(axis=1))[0]
-        foot = int(rows.max())                      # THIS head's own bottom edge
-        for i in range(PORT_FADE):
-            y = foot - PORT_FADE + 1 + i
-            if 0 <= y < a.shape[0]:
-                a[y, :, 3] *= 1 - (i + 1) / PORT_FADE
-        head = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')
-        cut = head.crop((x0, y0, x0 + side, y0 + side)).resize((PORT_PX, PORT_PX), Image.LANCZOS)
+        if len(rows):                       # soften each head's own bottom edge
+            foot = int(rows.max())
+            for i in range(PORT_FADE):
+                y = foot - PORT_FADE + 1 + i
+                if 0 <= y < a.shape[0]:
+                    a[y, :, 3] *= 1 - (i + 1) / PORT_FADE
+        cut = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')                    .crop((x0, y0, x0 + side, y0 + side))                    .resize((PORT_PX, PORT_PX), Image.LANCZOS)
         out = ground.copy(); out.alpha_composite(cut)
         q = np.array(out).astype(float); q[..., 3] *= disc
-        dst = CH / f'port_{tag}.webp'
+        dst = CH / f'port_{t}.webp'
         Image.fromarray(q.clip(0, 255).astype(np.uint8), 'RGBA')              .save(dst, 'WEBP', quality=90, method=6)
         total += dst.stat().st_size
-        print('port ', f'{tag:12s}', f'foot row {foot:3d}', f'{dst.stat().st_size / 1024:.0f}KB')
-    print(f'       {PORT_PX}px circles, box x{x0} y{y0} side {side}, '
-          f'total {total / 1024:.0f}KB')
+        print('port ', f'{t:12s}', f'{dst.stat().st_size / 1024:.0f}KB')
+    print(f'       box x{x0} y{y0} side {side}, from the stills, total {total / 1024:.0f}KB')
 
 
-GORGE_SRC = 'assets/bg/gorge-src/png'
-GORGE_ACT = ['act_gorge_near', 'act_gorge_span', 'act_gorge_far']
-GORGE_EDGE = 64      # columns of alpha fade at each plate's left and right edge
+STILL_SRC = 'assets/chars/jhumru_expression_stills_webp (1)'
+STILLS = ['still_neutral', 'still_proud', 'still_think', 'still_wow',
+          'still_ask', 'still_cheer']
+# Measured on still_neutral: mouth red ends by row 355 and the blue strap starts at
+# 350, so 362 crosses flat white shirt and flat strap and NO mouth. This is the seam
+# the old head-layer pack could not have -- its art stopped at 280, mid-mouth. These
+# are complete characters, so the drawing continues well past any seam we pick.
+STILL_SEAM = 362
+STILL_FEATHER = 10
 
 
-def ride_top(a, x, run=14, need=10, y_from=280):
-    """Top of the RIDEABLE surface in column x -- ochre earth or plank wood.
+def build_stills():
+    """One shared body plus a registered head per expression.
 
-    Two cheaper tests were tried and both fail on a full scene plate. Topmost
-    opaque finds the rope handrail, an 8px band 40px above the deck. Topmost solid
-    body finds tree canopy, which on the far plate sits at 26% and put the profile
-    240px above the path. Colour is what separates the surface from everything
-    standing on or above it: the path is warm ochre and the deck is warm plank,
-    while the foliage is green and the rock is grey. Same approach that found the
-    bank's path height for the opening.
+    The pack arrived as six complete characters, which is what was asked for -- but
+    from a model rather than a rig, so it drifts: the rear-wheel contact spans 18px
+    vertically and the bodies differ by up to 163,000 pixels. Cross-fading those
+    directly would morph the bicycle mid-dissolve, which is exactly the "not
+    seamless" everyone can see.
 
-    `need` of the next `run` rows must match too, so a warm pixel inside a leaf
-    cluster cannot be mistaken for ground."""
-    col = a[:, x]
-    R, G, B, A = col[:, 0], col[:, 1], col[:, 2], col[:, 3]
-    warm = (A > 200) & (R > 135) & (R - B > 45) & (G < R * 0.92) & (G > R * 0.38)
-    for y in range(y_from, a.shape[0] - run):
-        if warm[y] and warm[y:y + run].sum() >= need:
-            return y
-    return None
+    So the body comes from ONE file and never changes, and only the head is swapped.
+    That is the same shape as the failed attempt, with the two things that broke it
+    fixed: the seam is now BELOW the mouth (there is art there now), and every head
+    is registered on the blue tuft before it is cut, so a 9% scale spread and a 33px
+    position spread do not reach the screen.
 
-
-def band_top(a, x, minrun=40):
-    """Top of the LONGEST warm run in column x. For the approach plate.
-
-    There the path and the earth beneath it form one tall warm band, so its top is
-    the surface, and the short warm patches that fooled ride_top -- a rock sitting
-    above the path, a warm bit of distant canopy -- lose to it on length. It is the
-    wrong detector for the far plate, where a foreground bush hides the path and the
-    longest warm run is the ground BEHIND it, 160px too low."""
-    col = a[:, x]
-    R, G, B, A = col[:, 0], col[:, 1], col[:, 2], col[:, 3]
-    warm = (A > 200) & (R > 110) & (R - B > 35) & (G < R * 0.95) & (G > R * 0.30)
-    best_len, best_y, st = 0, None, None
-    for y in range(len(warm)):
-        if warm[y] and st is None:
-            st = y
-        elif not warm[y] and st is not None:
-            if y - st > best_len: best_len, best_y = y - st, st
-            st = None
-    if st is not None and len(warm) - st > best_len:
-        best_len, best_y = len(warm) - st, st
-    return best_y if best_len >= minrun else None
-
-
-# Which surface detector suits each plate, and which way its surface is allowed to
-# go. Neither detector works everywhere -- see the docstrings -- and the span needs
-# neither, because its deck is flat and measured. The monotonic constraint is design,
-# not a guess: the approach only ever climbs and the far side only ever eases down,
-# so a point that reverses is a misread and gets clamped to its neighbour. Without
-# it the approach's last points read 85% and 88% where the art is at 67%.
-GORGE_SURF = {'act_gorge_near': ('band', 'up'),
-              'act_gorge_span': ('flat', None),
-              'act_gorge_far':  ('ride', 'down')}
-
-
-def gorge_profile(a, name, pts=33):
-    """A surface profile for one plate, using the detector that suits it."""
-    how, mono = GORGE_SURF.get(name, ('ride', None))
-    w = a.shape[1]
-    if how == 'flat':
-        deck = ride_top(a, w // 4)
-        return [deck / a.shape[0] * 100] * pts
-    # Primary detector, with the other one as fallback. band_top returns nothing
-    # over the approach's bridge stub, where the monotonic clamp then froze the last
-    # six points ~15px below the art; ride_top reads that stretch fine.
-    first = band_top if how == 'band' else ride_top
-    other = ride_top if how == 'band' else band_top
-    raw = []
-    for i in range(pts):
-        x = min(w - 1, round(i * (w - 1) / (pts - 1)))
-        v = first(a, x)
-        raw.append(v if v is not None else other(a, x))
-    v = np.array([np.nan if r is None else r / a.shape[0] * 100 for r in raw])
-    out = v.copy()
-    for i in range(len(v)):                       # median-3: kill lone outliers
-        win = v[max(0, i - 1):i + 2]; win = win[~np.isnan(win)]
-        if len(win): out[i] = float(np.median(win))
-    good = out[~np.isnan(out)]
-    out = np.where(np.isnan(out), np.median(good), out)
-    if mono == 'up':     out = np.minimum.accumulate(out)   # climbing: y only falls
-    elif mono == 'down': out = np.maximum.accumulate(out)   # easing: y only rises
-    return list(out)
-
-
-def build_gorge():
-    """Convert the Broken Bridge plates and MEASURE what the runtime needs.
-
-    Three things are measured rather than taken from the delivered JSON, because
-    the drawing is what the rider has to sit on:
-
-      * the rideable surface profile of each plate, so his height follows the art
-        the way it follows the ramp;
-      * the real gap edges from the alpha -- the splintered plank ends run back
-        further than the nominal 864-1056, so the true opening is wider;
-      * the deck height either side of each plate join, to catch a step."""
-    src = ROOT / GORGE_SRC
+    Everything is cropped to ONE shared bbox, as build_wheelie does, so the layers
+    cannot drift apart at runtime."""
+    src = ROOT / STILL_SRC
     if not src.exists():
-        print('skip gorge (no plates)'); return
-    prof = {}
-    for name in GORGE_ACT + ['mid_gorge']:
-        p_in = src / f'{name}.png'
-        if not p_in.exists():
-            print('skip (missing)', name); continue
-        im = Image.open(p_in).convert('RGBA')
-        if name in GORGE_ACT:
-            # Each plate is cropped square at its own edges, and the runtime now
-            # OVERLAPS them, so a plate's hard left edge lands in the middle of its
-            # neighbour's art -- where a rim block ending in a straight vertical line
-            # across open sky is the most obvious thing on screen. Fading the outer
-            # columns lets one plate settle into the other. The deck starts well
-            # inside the fade on every plate, so nothing rideable is softened.
-            a = np.array(im).astype(float)
-            for i in range(GORGE_EDGE):
-                k = (i + 1) / GORGE_EDGE
-                a[:, i, 3] *= k
-                a[:, -1 - i, 3] *= k
-            im = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')
-        dst = BG / f'{name}.webp'
-        im.save(dst, 'WEBP', quality=76, method=6)
-        print('gorge', f'{name:16s}', im.size, f'{dst.stat().st_size / 1024:.0f}KB')
-        if name in GORGE_ACT:
-            a = np.array(im).astype(int)
-            prof[name] = [ride_top(a, min(im.width - 1, round(i * im.width / 16)))
-                          for i in range(17)]
-    pl = src / 'prop_plank.png'
-    if pl.exists():
-        im = Image.open(pl).convert('RGBA')
-        im.save(CH / 'prop_plank.webp', 'WEBP', quality=88, method=6)
-        print('gorge', f'{"prop_plank":16s}', im.size,
-              f'{(CH / "prop_plank.webp").stat().st_size / 1024:.0f}KB')
+        print('skip stills (no pack)'); return
+    ims = {}
+    for n in STILLS:
+        p = src / f'{n}.webp'
+        if p.exists():
+            ims[n] = Image.open(p).convert('RGBA')
+    if 'still_neutral' not in ims:
+        print('skip stills (no neutral to register against)'); return
 
-    print('\n       SURFACE PROFILE (fraction of frame height, 17 points L->R)')
-    for name, ys in prof.items():
-        txt = ','.join('null' if y is None else f'{y / 1080:.4f}' for y in ys)
-        print(f'       {name}\n         [{txt}]')
+    # The pack's ears are redder than the cycling loop's -- hue 4.3 and saturation
+    # 0.82 against the loop's 10.0 and 0.70 -- so without this his ears would jump
+    # colour the instant he stopped pedalling and the sprite swapped. Corrected
+    # against the LOOP, measured, not against a typed-in target.
+    loop = Image.open(CH / 'jhumru_cycle_still.webp').convert('RGBA')
+    lm, ls, lv = warm(loop, 175)
+    lh = np.array(loop.convert('RGB').convert('HSV')).astype(float)[..., 0][lm].mean()
+    for n, im in list(ims.items()):
+        m, s0, v0 = warm(im, 420)
+        hsv = np.array(im.convert('RGB').convert('HSV')).astype(float)
+        h0 = hsv[..., 0][m].mean()
+        hsv[..., 0][m] = np.clip(hsv[..., 0][m] + (lh - h0), 0, 255)
+        hsv[..., 1][m] = np.clip(hsv[..., 1][m] * (ls / s0), 0, 255)
+        hsv[..., 2][m] = np.clip(hsv[..., 2][m] * (lv / v0), 0, 255)
+        rgb = Image.fromarray(hsv.astype(np.uint8), 'HSV').convert('RGB')
+        ims[n] = Image.merge('RGBA', (*rgb.split(), im.split()[3]))
 
-    span = np.array(Image.open(src / 'act_gorge_span.png').convert('RGBA')).astype(int)
-    deck = ride_top(span, 400)
-    row = span[deck + 6, :, 3] > 8
-    runs, st = [], None
-    for x in range(span.shape[1]):
-        if not row[x] and st is None: st = x
-        elif row[x] and st is not None:
-            if x - st > 40: runs.append((st, x - 1))
-            st = None
-    print(f'\n       deck surface y={deck} ({deck / 1080 * 100:.1f}%); '
-          f'gap in the alpha: {runs}')
-    if runs:
-        g0, g1 = runs[0]
-        print(f'       -> GAP {g0}-{g1} = {g1 - g0 + 1}px ({100 * g0 / 1920:.1f}%'
-              f'-{100 * g1 / 1920:.1f}%), delivered spec said 864-1055 (192px)')
+    ref_area, ref_mid = tuft(ims['still_neutral'], upto=400)
+    print(f'       reference tuft {ref_area:.0f}px at ({ref_mid[0]:.0f},{ref_mid[1]:.0f})')
 
-    print('\n       JOINS (deck/ground height either side)')
-    for i in range(len(GORGE_ACT) - 1):
-        A = np.array(Image.open(src / f'{GORGE_ACT[i]}.png').convert('RGBA')).astype(int)
-        B = np.array(Image.open(src / f'{GORGE_ACT[i + 1]}.png').convert('RGBA')).astype(int)
-        ea = [v for v in (ride_top(A, x) for x in range(A.shape[1] - 24, A.shape[1])) if v]
-        eb = [v for v in (ride_top(B, x) for x in range(0, 24)) if v]
-        if ea and eb:
-            print(f'       {GORGE_ACT[i]} y{np.mean(ea):.0f} -> '
-                  f'{GORGE_ACT[i + 1]} y{np.mean(eb):.0f}   '
-                  f'step {np.mean(eb) - np.mean(ea):+.0f}px')
+    heads = {}
+    for n, im in ims.items():
+        t = tuft(im, upto=400)
+        head, sc = align(im, *(t if t else (ref_area, ref_mid)), ref_area, ref_mid)
+        a = np.array(head).astype(float)
+        for i in range(STILL_FEATHER):          # shirt into shirt, so the blend hides
+            a[STILL_SEAM - STILL_FEATHER + i, :, 3] *= 1 - (i + 1) / STILL_FEATHER
+        a[STILL_SEAM:, :, 3] = 0
+        heads[n] = a
+        print(f'       {n:16s} tuft {t[0] if t else 0:5.0f} -> x{sc:.3f}')
+
+    body = np.array(ims['still_neutral']).astype(float)
+    body[:STILL_SEAM - STILL_FEATHER, :, 3] = 0
+
+    # ONE bbox across the body and every head, so nothing can drift at runtime
+    x0, y0, x1, y1 = 10**9, 10**9, 0, 0
+    for a in [body] + list(heads.values()):
+        ys, xs = np.where(a[..., 3] > 8)
+        x0, x1 = min(x0, xs.min()), max(x1, xs.max())
+        y0, y1 = min(y0, ys.min()), max(y1, ys.max())
+    pad = 3
+    x0, y0 = max(0, int(x0) - pad), max(0, int(y0) - pad)
+    x1, y1 = min(body.shape[1] - 1, int(x1) + pad), min(body.shape[0] - 1, int(y1) + pad)
+    w, h = x1 - x0 + 1, y1 - y0 + 1
+
+    def cut(a):
+        return Image.fromarray(a[y0:y1 + 1, x0:x1 + 1].clip(0, 255).astype(np.uint8), 'RGBA')
+
+    total = 0
+    dst = CH / 'jhumru_still_body.webp'
+    cut(body).save(dst, 'WEBP', quality=88, method=6)
+    total += dst.stat().st_size
+    print('body ', f'{dst.name:24s}', (w, h), f'{dst.stat().st_size / 1024:.0f}KB')
+    for n, a in heads.items():
+        tag = n.replace('still_', '')
+        d = CH / f'face_{tag}.webp'
+        cut(a).save(d, 'WEBP', quality=88, method=6)
+        total += d.stat().st_size
+        print('face ', f'{tag:24s}', (w, h), f'{d.stat().st_size / 1024:.0f}KB')
+
+    # the anchor the runtime needs, measured off the shared crop
+    ba = np.array(cut(body)).astype(int)[..., 3]
+    ys, xs = np.where(ba > 8)
+    bot = ys.max(); band = xs[ys > bot - 4]
+    ax = (band.min() + band.max()) / 2 / w
+    print(f'       shared bbox x[{x0}-{x1}] y[{y0}-{y1}] -> {w}x{h}')
+    print(f'       RUNTIME: ar {w/h:.4f}  ax {ax:.4f}  seam {STILL_SEAM}  '
+          f'total {total/1024:.0f}KB')
 
 
 def build_ramp():

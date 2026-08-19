@@ -64,7 +64,11 @@ function tone(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContex
    user gesture, so nothing plays until the first pointerdown or keydown. */
 const SND={};
 let muted=false,audioOn=false;
-[['bgm','jungle_loop.mp3',.065,1],['bike','bike_loop.ogg',.17,1],['bell','bell.ogg',.34,0]]
+[['bgm','jungle_loop.mp3',.065,1],['bike','bike_loop.ogg',.17,1],['bell','bell.ogg',.34,0],
+ /* River bed for the raft scene. 0.055 sits just under the jungle bed at 0.065:
+    audible as a place, never as a sound you notice -- the playbook's rule. It
+    fades rather than cuts, because a 24s loop stopping dead reads as a bug. */
+ ['river','river_loop.mp3',.055,1]]
  .forEach(([k,f,v,loop])=>{const a=new Audio('assets/audio/'+f);
   a.volume=v;a.loop=!!loop;a.preload='auto';SND[k]=a});
 function audioLive(on){const m=$('#mute');if(m)m.classList.toggle('q',!on)}
@@ -74,6 +78,26 @@ function play(k){if(muted||!audioOn)return;const a=SND[k];if(!a)return;
   if(a.loop){if(a.paused){const pr=a.play();if(pr&&pr.then)pr.then(ok).catch(no);else ok()}else ok()}
   else{a.currentTime=0;const pr=a.play();if(pr&&pr.catch)pr.catch(()=>{})}
  }catch(e){no()}}
+/* Ramp a loop's volume on the virtual clock, so an ambience arrives and leaves with
+   the place rather than snapping on. Ramping to 0 stops it. */
+const FADE={};
+function fade(k,to,ms){
+ const a=SND[k];if(!a)return;
+ /* One ramp per sound. clean() fades the river OUT and the next scene fades it IN,
+    and with no token the two ran together: the fade-out reached zero and paused the
+    element while the fade-in was still raising its volume, so the river sat at full
+    gain and silent. The token makes the newer ramp win. */
+ const tok=(FADE[k]=(FADE[k]||0)+1);
+ if(to>0){if(muted||!audioOn)return;if(a.paused){a.volume=0;a.play().catch(()=>{})}}
+ const from=a.volume,t0=VT;
+ (function fr(){
+  if(FADE[k]!==tok)return;
+  const p=Math.min(1,(VT-t0)/ms);
+  a.volume=Math.max(0,Math.min(1,from+(to-from)*p));
+  if(p<1)requestAnimationFrame(fr);else if(to===0)a.pause();
+ })();
+}
+
 function stopSnd(k){const a=SND[k];if(a&&!a.paused){a.pause();if(!a.loop)a.currentTime=0}}
 function hushAll(){Object.keys(SND).forEach(stopSnd)}
 function audioStart(){
@@ -123,7 +147,7 @@ function noFace(){const b=$('#face');if(b){b.hidden=true;PFACE=null;
  b.querySelectorAll('img').forEach(i=>i.removeAttribute('src'))}}
 function el(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function svg(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
-function clean(){GEN++;kill();RELAY=null;foff();noFace();camReset();stopSnd('bike');FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
+function clean(){GEN++;kill();RELAY=null;foff();noFace();camReset();stopSnd('bike');fade('river',0,700);FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
 function setbg(k){BG.style.backgroundImage='url('+A[k]+')'}
 
 /* ---- camera scale ----

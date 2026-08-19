@@ -17,8 +17,16 @@ const SEG=['act_bank','act_bridge','act_clearing'];
    interior, which has to travel slower than the deck so that what shows through the
    hole in the bridge slides more slowly than the hole does. That differential IS
    the depth effect; matched rates would look painted on. */
-function pxBuild(f0,segs,mid,laps){
- segs=segs||SEG;
+function pxBuild(f0,o){
+ o=o||{};
+ const segs=o.segs||SEG;
+ /* `back` and `front` default to the opening's layers, so the world stays the same
+    place unless a scene deliberately says otherwise. The raft swaps near_grass out
+    -- grass over open water is wrong -- and adds three water bands.
+    `mids` are extra layers between the far set and the action plane, each with its
+    own rate, z, strip height and drift. */
+ const back=o.back||PXBACK, front=o.front||PXFRONT, mids=o.mids||[];
+ const laps=o.laps||[];
  /* `laps` OVERLAPS neighbouring plates instead of butting them, in design units.
     The gorge plates were each drawn self-contained, with their own rim at both
     edges -- so butted, the approach's thin bridge stub is followed by the span's
@@ -26,7 +34,6 @@ function pxBuild(f0,segs,mid,laps){
     left by its rim width lands that rim ON the approach's edge, which is what it
     is a drawing of. Where laps are given the join trunks are dropped: an overlap
     that works needs no cover, and a tree was the wrong object over a rocky rim. */
- laps=laps||[];
  const lapAt=i=>laps.slice(0,i).reduce((a,b)=>a+b,0);
  const lapAll=lapAt(segs.length);
  /* The camera is a FRACTION of total travel (0 = bank, .5 = bridge, 1 = clearing),
@@ -39,19 +46,33 @@ function pxBuild(f0,segs,mid,laps){
  const layer=(cls,z,css)=>{
   const d=el('<div class="'+cls+'"></div>');
   d.style.cssText='z-index:'+z+';'+css;STAGE.appendChild(d);return d};
- PXBACK.forEach(([k,rate])=>rig.push({el:layer('pxb',1,
+ back.forEach(([k,rate])=>rig.push({el:layer('pxb',1,
   'top:0;height:100%;background-image:url('+A[k]+')'),rate:rate,tile:1}));
- /* between the canopy (0.50) and the action plane (1.00), so it reads as nearer
-    than the horizon treeline and further than the bridge */
- const gorge=mid?layer('pxb',1,'top:0;height:100%;background-repeat:no-repeat;'
-  +'background-size:100% 100%;background-image:url('+A[mid.key]+')'
-  +(mid.dim?';filter:saturate(.86) brightness(.95)':'')):null;
- if(gorge)rig.push({el:gorge,rate:mid.rate,wide:mid.wide||segs.length});
+ /* Extra layers between the far set and the action plane. A plain one (the gorge
+    interior) is a single wide plate; a `strip` one (the water bands, the reeds) is a
+    tiling strip pinned to an edge, like the near fringe. */
+ mids.forEach(m=>{
+  /* `paint` is a CSS background instead of an image -- used for the water sheen,
+     which has to be a TILTED repeating gradient. The delivered ripples are long
+     horizontal streaks, and a horizontal line scrolling sideways shows no movement
+     at all, which is why the river read as still however fast it drifted. */
+  const bg=m.paint||('url('+A[m.key]+')');
+  const css=m.strip
+   ? (m.edge||'bottom')+':0;height:'+Math.round(m.strip)+'px;'
+     +'background-repeat:repeat;background-image:'+bg
+   : 'top:0;height:100%;background-repeat:no-repeat;background-size:100% 100%;'
+     +'background-image:'+bg;
+  const fx=m.fx?';filter:url(#'+m.fx+')':(m.dim?';filter:saturate(.86) brightness(.95)':'');
+  const el=layer((m.front?'pxf':'pxb')+(m.swell?' wave':''),m.z||1,
+   css+fx+(m.op?';opacity:'+m.op:''));
+  rig.push({el:el,rate:m.rate,wide:m.wide,tile:m.strip?1:0,strip:m.strip,
+            drift:m.drift||0,paint:!!m.paint});
+ });
  const act=layer('pxb',2,'top:0;height:100%');
  const plates=segs.map(k=>{
   const g=el('<div></div>');
   g.style.cssText='position:absolute;top:0;height:100%;background-size:100% 100%;'
-   +'background-repeat:no-repeat;background-image:url('+A[k]+')';
+   +'background-repeat:no-repeat;'+(k?'background-image:url('+A[k]+')':'');
   act.appendChild(g);return g});
  /* One trunk laid over each segment join. Both plates carry a full-height edge
     trunk, so where two segments butt you get two HALF trunks on a hard vertical
@@ -62,7 +83,7 @@ function pxBuild(f0,segs,mid,laps){
    +'background-repeat:no-repeat;background-image:url('+A.join_trunk+')';
   act.appendChild(t);return t});
  rig.push({el:act,rate:1});
- PXFRONT.forEach(([k,rate,edge,h])=>rig.push({el:layer('pxf',6,
+ front.forEach(([k,rate,edge,h])=>rig.push({el:layer('pxf',6,
   edge+':0;background-image:url('+A[k]+')'),rate:rate,tile:1,strip:h}));
  rig.act=act;rig.segs=plates;rig.n=segs.length;rig.f=f0||0;
 
@@ -73,7 +94,7 @@ function pxBuild(f0,segs,mid,laps){
   rig.forEach(o=>{
    if(o.tile){
     o.el.style.width=(Fw*4)+'px';
-    o.el.style.backgroundSize=(Fw*2)+'px 100%';
+    if(!o.paint)o.el.style.backgroundSize=(Fw*2)+'px 100%';
     if(o.strip)o.el.style.height=Math.round(Fw*o.strip/1920)+'px';
    } else o.el.style.width=(Fw*(o.wide||segs.length)-(o.wide?0:lapAll*u))+'px';
   });
@@ -85,8 +106,15 @@ function pxBuild(f0,segs,mid,laps){
    t.style.left=((i+1)*Fw-tw/2)+'px';t.style.width=tw+'px'});
   rig.setF(rig.f);
  };
- rig.setF=f=>{rig.f=f;rig.forEach(o=>{
-  o.el.style.transform='translateX('+Math.round(-f*rig.span*o.rate)+'px)'})};
+ /* Drift moves the TEXTURE inside a repeating layer rather than the layer itself,
+    so a river still flows while the camera is parked. Wrapped at the tile width so
+    it never runs away over a long scene. */
+ rig.setF=f=>{rig.f=f;const Fw=Math.round(F.clientWidth);rig.forEach(o=>{
+  o.el.style.transform='translateX('+Math.round(-f*rig.span*o.rate)+'px)';
+  if(o.drift)o.el.style.backgroundPositionX=Math.round(-(VT*o.drift)%(Fw*2))+'px';
+ })};
+ rig.flow=()=>{const Fw=Math.round(F.clientWidth);rig.forEach(o=>{
+  if(o.drift)o.el.style.backgroundPositionX=Math.round(-(VT*o.drift)%(Fw*2))+'px'})};
  rig.layout();
  window.__rig=rig;      /* test hook: step the camera by hand */
  return rig;
@@ -124,9 +152,14 @@ function yAt(track,p){
    sized for its widest sprite -- object-fit:contain would otherwise shrink a wide
    walk cycle to fit a box cut for the narrower idle. */
 function mkActor(modes,defKey,rider){
- const w=el('<div class="cyc"><div class="cycsh"></div><img></div>');
+ /* Three layers: the body sprite, the face on it, and a spare face slot the
+    outgoing expression dissolves through. */
+ const w=el('<div class="cyc"><div class="cycsh"></div><img>'
+           +'<img class="face" hidden><img class="face out" hidden></div>');
  STAGE.appendChild(w);
- const o={w:w,img:w.querySelector('img'),x:0,y:0,f:1,modes:modes,base:modes[defKey]};
+ const im=w.querySelectorAll('img');
+ const o={w:w,img:im[0],f1:im[1],f2:im[2],fk:'neutral',x:0,y:0,f:1,
+          modes:modes,base:modes[defKey]};
  /* `rider` marks who the wheel loop belongs to */
  o.riding=on=>{w.classList.toggle('riding',!!on);
   if(rider){if(on)play('bike');else stopSnd('bike')}};
@@ -142,8 +175,30 @@ function mkActor(modes,defKey,rider){
   const r=w.getBoundingClientRect(),f=F.getBoundingClientRect();
   return [100*(r.x-f.x+fx*r.width)/f.width, 100*(r.y-f.y+fy*r.height)/f.height];
  };
+ /* Which expression he wears. Held across mode changes, so a stop sets it once and
+    the cycling and wheelie sprites -- which carry their own heads -- ignore it until
+    he stops again.
+
+    The dissolve is 260ms and it moves ONLY the head: the body underneath is the same
+    file throughout, so nothing about the bicycle can shift mid-fade. Runs on VT, so
+    it pauses with the game. */
+ o.face=k=>{
+  if(!k||!FACES[k]||k===o.fk)return;
+  const was=o.f1.getAttribute('src'),m=o.m||o.base;
+  o.fk=k;
+  if(!m.face||!was||o.f1.hidden){o.dress();return}
+  o.f2.src=was;o.f2.hidden=false;o.f2.style.opacity='1';
+  o.f1.src=FACES[k];
+  tween(260,p=>{o.f2.style.opacity=String(1-easeOut(p))},
+        ()=>{o.f2.hidden=true;o.f2.removeAttribute('src')});
+ };
+ /* The stopped body is headless; it is never drawn without a face. */
+ o.dress=()=>{const m=o.m||o.base;
+  o.f2.hidden=true;
+  if(m.face&&FACES[o.fk]){o.f1.src=FACES[o.fk];o.f1.hidden=false}
+  else o.f1.hidden=true};
  o.show=k=>{const m=o.modes[k];if(!m||m===o.m)return;
-  o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.layout()};
+  o.m=m;o.img.src=m.url;w.classList.toggle('wheelie',!!m.wheelie);o.dress();o.layout()};
  o.layout=()=>{
   const m=o.m||o.base;
   o.CH=U(m.hu);o.CW=Math.round(o.CH*m.ar);
@@ -319,7 +374,7 @@ function hook(){
     or shrink in levels.js without touching any timing here. */
  const say=(lines,t0)=>{
   lines.forEach((l,i)=>later(()=>{
-   ask(l.line,l.who,l.face);
+   ask(l.line,l.who,l.face);if(J&&l.face)J.face(l.face);
    if(l.fx==='bell')bellBeat();
    if(l.fx==='map')trailMap();
    if(l.fx==='ask')askToCome();
@@ -373,7 +428,9 @@ function hook(){
      bridge segment so the deck covers where it meets it; the take-off ramp on the
      deck stays in front. */
   const rA=putRamp(rig,RAMP_A_TIP*.5,RAMP_A_CREST,RAMP_A_RISE,rig.segs[1]);
-  const rB=putRamp(rig,.5+RAMP_B_TIP*.5,DECK-RAMP_B_RISE,RAMP_B_RISE);
+  /* Only the ENTRY ramp now. The take-off plank that used to sit on the deck is
+     gone, so leg B is a plain roll off the far end of the bridge and down to the
+     clearing -- no lip to launch from means no wheelie there either. */
   /* his box fits his widest sprite -- the wheelie canvas */
   /* 322 = 215 * 1.5. Monty stays 185, so the elephant now reads 1.74x the monkey.
      For 1.5x the MONKEY instead, this is 278. Feet are unaffected either way --
@@ -420,17 +477,14 @@ function hook(){
   /* ---- leg B: both travel on to the clearing ---- */
   later(()=>{
    J.show('cyc');J.riding(1);
-   const runB=wheelieRun(J,rB,c=>(c-.5)/.5);
-   const offP=(rB.crestCam-.5)/.5;                   /* leg fraction at the lip */
+   /* Deck height until the bridge ends, then a smooth ease down to the clearing.
+      DECK_OFF is where his wheel leaves the deck, measured as a fraction of leg B. */
+   const DECK_OFF=0.52, LAND=0.86;
    tween(LEG,p=>{
     rig.setF(.5+p*.5);
-    const u=rB.u(.5+p*.5,J.wheelDX());
-    let y;
-    if(u<=0)y=DECK; else if(u<1)y=rB.y(u);
-    else{const q=Math.min(1,(p-offP)/(0.80-offP));   /* off the lip, down to the clearing */
-         y=rB.crestY+(GROUND3-rB.crestY)*q}
+    const y=p<=DECK_OFF ? DECK
+          : DECK+(GROUND3-DECK)*easeOut(Math.min(1,(p-DECK_OFF)/(LAND-DECK_OFF)));
     J.place(HOLD_X,y);
-    runB(p);
    },()=>{J.img.style.transform=''});  },t);
   t+=LEG;
 
@@ -457,7 +511,8 @@ function hook(){
    guessed waypoints. Same approach as the ramp. */
 function gorge(){
  clean();window.__scene='gorge';
- const rig=pxBuild(0,GORGE.seg,{key:'mid_gorge',rate:GORGE.midRate,dim:1},GORGE.laps);
+ const rig=pxBuild(0,{segs:GORGE.seg,laps:GORGE.laps,
+  mids:[{key:'mid_gorge',rate:GORGE.midRate,dim:1,wide:GORGE.seg.length}]});
  const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
  RELAY=()=>{rig.layout();J.layout()};
 
@@ -532,6 +587,75 @@ function gorge(){
  });
  fon('pointerdown',()=>{});
 }
+/* ---------- the river ----------
+   Hurdle two. He rides down to the shore, three logs are waiting, and a raft carries
+   him across.
+
+   The crossing is where the layer stack earns itself. Seven layers at 0.20 / 0.50 /
+   0.62 / 1.00 / 1.22 / 1.40 / 1.62, and the two that matter are water_near at 1.22 --
+   faster than the raft, so it cuts across the hull and he floats IN the water -- and
+   near_reeds at 1.62, because on a crossing he is barely moving against the far bank
+   and the foreground has to carry the sense of travel.
+
+   The water also drifts on its own clock, so the river is alive while he is parked
+   at the shore reading the logs. Without that a wide flat plane just looks dead.
+
+   The mechanic is not here yet: the three logs are placed and the raft assembles on
+   a timer, which is enough to see whether the location reads. */
+function river(){
+ clean();window.__scene='river';
+ const rig=pxBuild(0,{segs:RAFT.seg,mids:RAFT.mids,front:RAFT.front});
+ const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
+ RELAY=()=>{rig.layout();J.layout()};
+
+ fade('river',0.055,1400);          /* the place arrives before he does */
+ /* the river keeps moving between beats, not only while the camera does */
+ (function flow(){if(window.__scene!=='river')return;rig.flow();requestAnimationFrame(flow)})();
+
+ /* three logs on the shore, evenly spaced across the middle of the plate */
+ const logs=['log_a','log_b','log_c'].map((k,i)=>{
+  const e=el('<img class="logp" src="'+A[k]+'">');
+  rig.segs[0].appendChild(e);e.dataset.i=i;return e});
+ /* Placed by their BOTTOM edge, not their top: the art is 3:1, so a log is w/3
+    tall, and resting it on the shore means top = shore - w/3. Placed by top they
+    hung 4% below the surface and read as sunk into the slope.
+    They start at 52% so they are laid out AHEAD of him -- he stops at HOLD_X 42%
+    and was otherwise riding through the first one. */
+ const placeLogs=()=>{
+  const Fw=F.clientWidth,Fh=F.clientHeight,w=U(300),h=w/3;
+  logs.forEach((e,i)=>{
+   e.style.cssText='position:absolute;z-index:3;width:'+w+'px;pointer-events:none;'
+    +'left:'+((0.52+i*0.16)*Fw-w/2)+'px;top:'+(RAFT.logsY/100*Fh-h)+'px';
+  });
+ };
+ placeLogs();
+ const relay0=RELAY;RELAY=()=>{relay0();placeLogs()};
+
+ J.place(-12,yAt(RAFT.shore,0));
+ const RIDE=RIDE_IN*1.15;
+
+ /* The scene ENDS at the shore. Crossing on the raft is cut until the word game
+    exists -- floating away before there is anything to solve made the puzzle look
+    like it had already been solved. The raft, the splash and the far bank are all
+    built and measured; they come back when the mechanic does. */
+ tween(RIDE,p=>{
+  const x=-12+(HOLD_X+12)*easeRide(p);
+  J.place(x,yAt(RAFT.shore,Math.max(0,x/100)));
+ },()=>{
+  J.show('still');J.riding(0);tone(430,.12);
+  later(()=>ask('A river! It is far too wide to ride across.','jhu','wow'),300);
+  later(()=>ask('Three logs. Two of them belong together.','jhu','think'),300+LINE);
+  later(()=>{
+   F.appendChild(el('<div class="over card"><h3>The River</h3>'
+    +'<p>The word game goes here.<br>Two logs that mean the same make one raft.</p>'
+    +'<button class="btn">Back to the start</button></div>'));
+   F.querySelector('.btn').onclick=()=>title();
+  },300+LINE*2+400);
+ });
+}
+/* Press R to jump straight to the river while it is being built. */
+addEventListener('keydown',e=>{if(e.key==='r'||e.key==='R')river()});
+
 /* Press B from anywhere to jump straight to the hurdle while it is being built. */
 addEventListener('keydown',e=>{if(e.key==='b'||e.key==='B')gorge()});
 
