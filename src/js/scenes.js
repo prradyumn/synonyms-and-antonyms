@@ -187,7 +187,7 @@ const GROUND1=77.5,DECK=65.3,GROUND3=86;
    it beds into the bank and the deck instead of sitting flush on both. Its crest
    is therefore 0.53% below the plank surface and its base 0.56% below the path --
    both under 6px, which the u<=0 / u>=1 clamps absorb without a visible step. */
-const RAMP_A_CREST=65.83, RAMP_A_RISE=12.22, RAMP_A_TIP=0.755;
+const RAMP_A_CREST=65.83, RAMP_A_RISE=12.22, RAMP_A_TIP=0.687;
 const RAMP_B_RISE=10.5,          RAMP_B_TIP=0.30;   /* fraction along leg B */
 /* The plate is 5:2, which is a 21.8-degree slope -- steep for something a small
    character cycles up. Stretched horizontally it reads as a gentler built ramp,
