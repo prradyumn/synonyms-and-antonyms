@@ -442,7 +442,7 @@ def build_portraits():
           f'total {total / 1024:.0f}KB')
 
 
-GORGE_SRC = 'broken-bridge-assets/broken-bridge-assets/png'
+GORGE_SRC = 'assets/bg/gorge-src/png'
 GORGE_ACT = ['act_gorge_near', 'act_gorge_span', 'act_gorge_far']
 
 
