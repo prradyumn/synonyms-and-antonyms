@@ -128,7 +128,18 @@ their sprites, the walk cycle and the footstep sound.
 
 **Pacing is one knob.** `PACE` in `scenes.js` multiplies every base timing —
 ride-in, camera travel, how long each line stays, how long the map holds — so
-they stay in proportion. At `1.45` the question lands around 30s.
+they stay in proportion. At `1.45` the question lands around 31s.
+
+The entry has its own base (`RIDE_IN`) and its own easing. `easeRide` is gentler
+than `easeOut`: cubic braked hard at the end, which read as him *stopping* rather
+than *arriving*. He now holds a steady pedalling speed and only settles at the
+last moment.
+
+**His path follows the ramp as placed, not as assumed.** Height comes from the
+ramp's measured surface profile, and because the climb ramp is bedded — base 2px
+below the bank, crest 6px below the deck — those two gaps are blended across
+rather than clamped, so there is no hitch stepping on or off it. Verified
+continuous: zero height jumps above 0.35% of frame across the whole leg.
 
 ~17s end to end, skippable by tapping. The pauses size themselves off `HOOK` in
 `levels.js` — one entry per stop, so adding or cutting a line needs no code change.

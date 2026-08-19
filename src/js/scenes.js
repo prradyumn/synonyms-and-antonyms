@@ -82,6 +82,10 @@ function tween(ms,step,after){
  })();
 }
 const easeOut=p=>1-Math.pow(1-p,3);
+/* Gentler than easeOut for the entry: cubic braked hard at the end, which read
+   as him stopping rather than arriving. This keeps a steady pedalling speed and
+   only settles at the last moment. */
+const easeRide=p=>1-Math.pow(1-p,1.7);
 /* y at fraction p along a [fraction, y%] track */
 function yAt(track,p){
  for(let i=1;i<track.length;i++)if(p<=track[i][0]){
@@ -160,7 +164,7 @@ function title(){
    figure multiplied by it, so raising PACE slows the bicycle, the camera, how long
    each line stays and how long the map holds, all together and in proportion. */
 const PACE=1.45;
-const RIDE_IN=1500*PACE, LEG=4200*PACE, SETTLE=800*PACE, LINE=1550*PACE;
+const RIDE_IN=2700*PACE, LEG=4200*PACE, SETTLE=800*PACE, LINE=1550*PACE;
 /* how long the trail map stays up, and the fade off it */
 const MAP_LIFE=2600*PACE,MAP_FADE=420;
 const HOLD_X=42;
@@ -325,7 +329,7 @@ function hook(){
   let t=0;
   /* ---- stop 1: the near bank ---- */
   J.riding(1);
-  tween(RIDE_IN,p=>J.place(-14+(HOLD_X+14)*easeOut(p),GROUND1),
+  tween(RIDE_IN,p=>J.place(-14+(HOLD_X+14)*easeRide(p),GROUND1),
         ()=>{J.show('still');J.riding(0);tone(430,.12)});
   t=RIDE_IN;t+=say(HOOK.bank,t);
 
@@ -334,10 +338,18 @@ function hook(){
    say(HOOK.legA,0);                                 /* spoken as he pedals off */
    J.show('cyc');J.riding(1);
    const runA=wheelieRun(J,rA,c=>c/.5);
+   /* The ramp is bedded, so its base sits 2px below the bank and its crest 6px
+      below the deck. Blending across those instead of clamping means there is no
+      hitch stepping on or off it -- his path follows the ramp as placed. */
+   const BLEND=0.25;
+   const yA=(u)=>{
+    if(u>=1)return rA.crestY+(DECK-rA.crestY)*Math.min(1,(u-1)/BLEND);
+    if(u>0)return rA.y(u);
+    return rA.y(0)+(GROUND1-rA.y(0))*Math.min(1,-u/BLEND);
+   };
    tween(LEG,p=>{
     rig.setF(p*.5);
-    const u=rA.u(p*.5,J.wheelDX());
-    J.place(HOLD_X,u<=0?GROUND1:u>=1?DECK:rA.y(u));
+    J.place(HOLD_X,yA(rA.u(p*.5,J.wheelDX())));
     runA(p);
    },()=>{J.img.style.transform=''});  },t);
   t+=LEG;
