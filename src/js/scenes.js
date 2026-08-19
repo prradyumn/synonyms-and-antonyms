@@ -157,6 +157,8 @@ function title(){
 /* Travel was reading as rushed. LEG is the slowest lever -- it is how long a
    full screen of world takes to pass. */
 const RIDE_IN=1500,LEG=4200,JOIN=1000,SETTLE=800,LINE=1550;
+/* how long the trail map stays up, and the fade off it */
+const MAP_LIFE=2600,MAP_FADE=420;
 const HOLD_X=42,MONTY_X=58;
 /* The three walkable surfaces, measured off the art. GROUND1 is the top of the
    ochre PATH in act_bank -- measuring topmost-opaque instead finds the bushes
@@ -173,7 +175,12 @@ const GROUND1=77.5,DECK=65.6,GROUND3=86;
    and leave him floating over the lip. */
 const RAMP_A_RISE=GROUND1-DECK, RAMP_A_TIP=0.70;   /* fraction along leg A */
 const RAMP_B_RISE=10.5,          RAMP_B_TIP=0.30;   /* fraction along leg B */
-const RAMP_AR=2.5;                                  /* the plate is 5:2 */
+/* The plate is 5:2, which is a 21.8-degree slope -- steep for something a small
+   character cycles up. Stretched horizontally it reads as a gentler built ramp,
+   and 1.6 lands the real slope at 14 degrees, matching the tilt used on the
+   rider. Stretching is safe for the physics: the surface profile is a fraction of
+   the ramp's own box, so a wider box still puts the wheels on the planks. */
+const RAMP_AR=2.5, RAMP_STRETCH=1.6;
 
 /* Surface height as a fraction of the ramp's own box, MEASURED off
    assets/bg/ramp.webp by build_ramp() -- foot on the left, crest on the right.
@@ -192,12 +199,18 @@ function rampSurface(u){
    rider needs to walk its profile. */
 function putRamp(rig,tipCam,crestY,rise){
  const Fw=F.clientWidth,Fh=F.clientHeight;
- const rh=rise/100*Fh,rw=Math.round(rh*RAMP_AR);
+ const rh=rise/100*Fh,rw=Math.round(rh*RAMP_AR*RAMP_STRETCH);
  const rp=el('<img class="ramp" src="'+A.ramp+'">');
  rp.style.cssText='position:absolute;width:'+rw+'px;height:'+Math.round(rh)+'px;'
   +'left:'+(tipCam*rig.span+HOLD_X/100*Fw-rw*0.94)+'px;'
   +'top:'+(crestY/100*Fh)+'px;z-index:2';
  rig.act.appendChild(rp);
+ const left=tipCam*rig.span+HOLD_X/100*Fw-rw*0.94;
+ const sh=el('<div class="rampsh"></div>');
+ sh.style.cssText='position:absolute;z-index:1;left:'+(left+rw*0.03)+'px;'
+  +'top:'+((crestY+rise)/100*Fh-rh*0.10)+'px;'
+  +'width:'+Math.round(rw*0.96)+'px;height:'+Math.round(rh*0.20)+'px';
+ rig.act.appendChild(sh);
  /* his position along the ramp, 0 at the foot and 1 at the crest. It is placed so
     he is 94% along it at tipCam, which is where the crest sits. */
  const wCam=rw/rig.span;
@@ -258,7 +271,7 @@ function hook(){
  function trailMap(){
   const m=el('<img class="trailmap" src="'+A.map+'">');
   F.appendChild(m);
-  later(()=>{m.classList.add('away');later(()=>m.remove(),420)},2600);
+  later(()=>{m.classList.add('away');later(()=>m.remove(),MAP_FADE)},MAP_LIFE);
  }
  /* He turns to the player. Nothing advances until they answer, so the skip
     listener comes off -- the choice IS the interaction at this point. */
@@ -310,7 +323,10 @@ function hook(){
 
   /* ---- stop 2: he stops midspan and speaks, alone ---- */
   later(()=>{J.show('still');J.riding(0);tone(430,.12)},t);
-  t+=say(HOOK.bridge,t);
+  /* The map pops on the last line of this stop, so the stop has to outlast it --
+     otherwise leg B starts while the card is still on screen. */
+  t+=Math.max(say(HOOK.bridge,t),
+              (HOOK.bridge.length-1)*LINE+MAP_LIFE+MAP_FADE+150);
 
   /* ---- leg B: both travel on to the clearing ---- */
   later(()=>{

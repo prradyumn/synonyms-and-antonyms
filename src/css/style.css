@@ -52,6 +52,10 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 .cycsh{position:absolute;left:13%;bottom:-1%;width:74%;height:9%;border-radius:50%;background:radial-gradient(closest-side,rgba(34,22,8,.5),rgba(34,22,8,.2),rgba(34,22,8,0))}
 .vine{position:absolute;left:0;right:0;bottom:calc(244 * var(--u));height:calc(48 * var(--u));z-index:5;pointer-events:none}
 .ramp{position:absolute;z-index:2;pointer-events:none}
+/* a soft shadow along the ramp's base, so it beds into the ground instead of
+   reading as a cutout laid on top of it */
+.rampsh{position:absolute;z-index:1;border-radius:50%;pointer-events:none;
+ background:radial-gradient(closest-side,rgba(36,24,10,.38),rgba(36,24,10,.14),rgba(36,24,10,0))}
 /* the trail map Jhumru sees on the bridge */
 .trailmap{position:absolute;left:63%;top:40%;width:calc(580 * var(--u));border:calc(11 * var(--u)) solid #FFFDF5;
  transform:translate(-50%,-50%);z-index:11;border-radius:calc(26 * var(--u));
