@@ -69,6 +69,15 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 .tag.gone{pointer-events:none}
 .arch{pointer-events:none}
 .ramp{position:absolute;z-index:2;pointer-events:none}
+/* the trail map Jhumru sees on the bridge */
+.trailmap{position:absolute;left:64%;top:44%;width:calc(600 * var(--u));
+ transform:translate(-50%,-50%);z-index:11;border-radius:calc(26 * var(--u));
+ box-shadow:0 calc(10 * var(--u)) 0 rgba(0,0,0,.22);animation:mappop .5s cubic-bezier(.3,1.5,.5,1) both}
+.trailmap.away{animation:mapaway .4s ease-in both}
+@keyframes mappop{from{opacity:0;transform:translate(-50%,-42%) scale(.6)}
+ to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes mapaway{from{opacity:1;transform:translate(-50%,-50%) scale(1)}
+ to{opacity:0;transform:translate(-50%,-56%) scale(.85)}}
 /* On a wheelie only the rear wheel is down, so the contact shadow shrinks to sit
    under it rather than spanning a wheelbase that is no longer on the ground. */
 .cyc.wheelie .cycsh{left:33%;width:16%;height:5%;bottom:-0.5%}

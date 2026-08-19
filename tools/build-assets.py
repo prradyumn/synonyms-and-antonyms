@@ -118,6 +118,8 @@ def build_audio():
          ['-codec:a', 'libvorbis', '-q:a', '4']),
         ('raw_step.ogg', 'step.ogg', 'volume=16.0,alimiter=limit=0.9',
          ['-codec:a', 'libvorbis', '-q:a', '4']),
+        ('raw_bell.ogg', 'bell.ogg', 'volume=2.2,alimiter=limit=0.85',
+         ['-codec:a', 'libvorbis', '-q:a', '4']),
     ]
     for src, dst, filt, codec in jobs:
         p_in = raw / src

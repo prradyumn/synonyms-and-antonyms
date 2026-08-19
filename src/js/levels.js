@@ -32,15 +32,31 @@ const RIDER={
  land :{url:'assets/chars/wheelie_land.webp',      hu:314, ar:1.0886,  ax:0.409}
 };
 
-/* The opening is three stops: he introduces himself on the near bank, stops
-   alone midway across the bridge to say what he is doing, and reaches the
-   clearing -- where Monty comes in from the right to meet him.
-   Add or remove lines and hook() resizes each pause to fit; nothing else. */
+/* ---------------------------------------------------------------------------
+   THE OPENING SCRIPT.  "Jhumru's Synonym Adventure" -- hook.
+
+   who : 'nar' the narrator, 'jhu' Jhumru. They get different voices in speak().
+   fx  : 'bell' rings the bicycle bell, 'map' pops the jungle trail map up,
+         'ask' turns to the player and waits for a Yes before going on.
+
+   Keyed to the beats of the opening, not to timings: each stop plays its lines
+   in order and the pause sizes itself to fit, so lines can be added or cut here
+   without touching scenes.js.
+   ------------------------------------------------------------------------- */
 const HOOK={
- bank:['Hello! I am Jhumru.','Today the Word Tree gives its fruit, and I am going there.'],
- bridge:['But the Tree has been dropping its words along this trail.',
-         'And a place that loses its word forgets how to be itself.'],
- clearing:['Monty! You came.','Then we will find the words together.']
+ /* stop 1 -- the near bank, he introduces himself and his bicycle */
+ bank:[{who:'nar',line:'Jhumru was setting off on an exciting adventure through the jungle on his new bicycle.'},
+       {who:'jhu',line:'Hello, everyone! Have you seen my new bicycle?'},
+       {who:'jhu',line:'Tring! Tring! Look at it! It is shiny! It is bright! It is sparkling!',fx:'bell'}],
+ /* leg A -- he climbs on and pedals off, up the ramp onto the bridge */
+ legA:[{who:'jhu',line:'Today, I am going on a jungle adventure journey!'}],
+ /* stop 2 -- midway across the bridge, the trail map appears */
+ bridge:[{who:'jhu',line:'I wonder what we will find along the way!'},
+         {who:'jhu',line:'Oh! The jungle path looks full of surprises and challenges.',fx:'map'}],
+ /* stop 3 -- the clearing. He turns to the player and waits to be answered. */
+ clearing:[{who:'jhu',line:'Will you come on this adventure with me?',fx:'ask'}],
+ /* and once they say yes */
+ go:[{who:'nar',line:'Wonderful! Let us go!'}]
 };
 
 /* ---------------------------------------------------------------------------

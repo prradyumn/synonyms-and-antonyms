@@ -221,8 +221,37 @@ function hook(){
   .map(k=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=A[k]})))
   .then(()=>{if(g===GEN)roll()});
 
- const say=(lines,t0)=>{lines.forEach((l,i)=>later(()=>ask(l),t0+i*LINE));
-                        return Math.max(LINE,lines.length*LINE)};
+ /* Plays one stop of HOOK. Each line carries its own voice and optional cue, and
+    the stop's length falls out of how many lines it has -- so the script can grow
+    or shrink in levels.js without touching any timing here. */
+ const say=(lines,t0)=>{
+  lines.forEach((l,i)=>later(()=>{
+   ask(l.line,l.who);
+   if(l.fx==='bell')play('bell');
+   if(l.fx==='map')trailMap();
+   if(l.fx==='ask')askToCome();
+  },t0+i*LINE));
+  return Math.max(LINE,lines.length*LINE);
+ };
+ /* the jungle trail map, popped up in front of him */
+ function trailMap(){
+  const m=el('<img class="trailmap" src="'+A.map+'">');
+  F.appendChild(m);
+  later(()=>{m.classList.add('away');later(()=>m.remove(),420)},2600);
+ }
+ /* He turns to the player. Nothing advances until they answer, so the skip
+    listener comes off -- the choice IS the interaction at this point. */
+ function askToCome(){
+  foff();
+  const c=el('<div class="over card"><h3>Will you come?</h3>'
+   +'<button class="btn">Yes!</button></div>');
+  F.appendChild(c);
+  c.querySelector('.btn').onclick=e=>{
+   e.stopPropagation();c.remove();
+   say(HOOK.go,0);
+   later(intro,Math.max(LINE,HOOK.go.length*LINE)+200);
+  };
+ }
 
  function roll(){
   const rig=pxBuild(0);
@@ -246,6 +275,7 @@ function hook(){
 
   /* ---- leg A: ride to the middle of the bridge ---- */
   later(()=>{
+   say(HOOK.legA,0);                                 /* spoken as he pedals off */
    J.show('cyc');J.riding(1);
    putRamp(rig,RAMP_A_TIP*.5,DECK,RAMP_A_RISE);      /* the climb onto the bridge */
    const runA=wheelieRun(J,WHEELIE_A,TILT_A);
@@ -278,8 +308,8 @@ function hook(){
    tween(JOIN,p=>M.place(118+(MONTY_X-118)*easeOut(p),GROUND3,-1),
          ()=>{M.show('idle');cancel(si)});
   },t);
-  t+=JOIN;t+=say(HOOK.clearing,t);
-  later(done,t+250);
+  t+=JOIN;
+  say(HOOK.clearing,t);   /* ends on 'Will you come?' -- askToCome() takes over */
  }
 }
 
@@ -297,7 +327,8 @@ function intro(){
  F.appendChild(svg(vineSVG()));
  const go=svg(tagSVG('start',0));go.style.left='72%';go.style.bottom=U(52)+'px';
  go.onclick=()=>map();F.appendChild(go);
- ask('Three friends. Six places. Someone always needs another word.');
+ /* the script already said 'Let us go', so this is just the instruction */
+ ask('Tap the start tag to begin the trail.','nar');
 }
 
 

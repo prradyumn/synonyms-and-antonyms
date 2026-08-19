@@ -62,7 +62,8 @@ function tone(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContex
    user gesture, so nothing plays until the first pointerdown or keydown. */
 const SND={};
 let muted=false,audioOn=false;
-[['bgm','jungle_loop.mp3',.065,1],['bike','bike_loop.ogg',.17,1],['step','step.ogg',.26,0]]
+[['bgm','jungle_loop.mp3',.065,1],['bike','bike_loop.ogg',.17,1],['step','step.ogg',.26,0],
+ ['bell','bell.ogg',.34,0]]
  .forEach(([k,f,v,loop])=>{const a=new Audio('assets/audio/'+f);
   a.volume=v;a.loop=!!loop;a.preload='auto';SND[k]=a});
 function audioLive(on){const m=$('#mute');if(m)m.classList.toggle('q',!on)}
@@ -84,7 +85,10 @@ addEventListener('pointerdown',audioStart,{once:true});
 addEventListener('keydown',audioStart,{once:true});
 
 let said='';
-function speak(t){said=t;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.72;u.pitch=1.05;const v=speechSynthesis.getVoices().find(v=>/en-IN|India/i.test(v.lang+v.name))||speechSynthesis.getVoices().find(v=>/^en/i.test(v.lang));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
+function speak(t,who){said=t;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);
+ /* the narrator sits lower and slower than Jhumru, so a child can tell who is
+    talking without being told */
+ u.rate=who==='nar'?.66:.72;u.pitch=who==='nar'?.82:1.12;const v=speechSynthesis.getVoices().find(v=>/en-IN|India/i.test(v.lang+v.name))||speechSynthesis.getVoices().find(v=>/^en/i.test(v.lang));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
 $('#spk').onclick=()=>speak(said);
 /* First tap TURNS SOUND ON rather than muting -- the button starts in the
    not-live state, so its first job is to start audio, not silence it. */
@@ -95,7 +99,7 @@ $('#mute').onclick=()=>{
  muted=!muted;Object.values(SND).forEach(a=>{a.muted=muted});
  if(muted){hushAll();audioLive(false)}else play('bgm');
 };
-function ask(t){$('#asktxt').textContent=t;speak(t)}
+function ask(t,who){$('#asktxt').textContent=t;speak(t,who)}
 function el(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function svg(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function pips(){PIPS.innerHTML='';L.forEach((_,k)=>PIPS.appendChild(el('<span class="pip'+(k<cur?' on':'')+'"></span>')))}
