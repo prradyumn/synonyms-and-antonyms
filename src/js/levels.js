@@ -111,15 +111,33 @@ const RAFT={
              +"rgba(255,255,255,0) 26px 54px,rgba(214,244,255,.16) 54px 57px,"
              +"rgba(255,255,255,0) 57px 92px)"},
        {key:'near_reeds', rate:1.62,z:7,strip:300, edge:'bottom',front:1}],
- /* near_grass is dropped for this scene -- grass over open water is wrong. */
+ /* near_grass is dropped for this scene -- grass over open water is wrong.
+    mid_canopy goes too: a distant treeline on the horizon reads as the far bank, and
+    the whole point of this place is that the land ENDS. far_sky plus water_far leaves
+    water meeting sky, which cannot be misread. */
+ back:[['far_sky',0.20]],
  front:[['near_leaves',1.40,'top',169]],
 
- /* Measured off act_raft_bank: the ochre shore's top edge, and the row where the
-    plate stops, which is the water's edge. */
- shore:[[0,61.6],[0.20,60.6],[0.30,62.4],[0.42,66.0]],
+ /* The bank plate already has three logs PAINTED into it at 36%, 53% and 70%, with
+    their bases level at 66%. Placing prop logs as well put six on the shore, and
+    riding along the shore's far top edge at 58% put him on a different plane from
+    the logs entirely -- the ground is seen nearly edge-on, so further DOWN the image
+    is nearer the viewer, and the logs sit in the middle of the band, not on its far
+    lip. 66% is their plane and therefore his. */
+ logs:[36,53,70],
+ shore:[[0,64.0],[0.25,65.5],[0.36,66.0],[1,66.5]],
+ stop:82,          /* past the last log, at the water's edge */
+ /* How far the camera drifts on once he has stopped, as a camera fraction. The bank
+    plate is exactly one frame wide and the segment after it is an empty spacer, so
+    any pan at all slides open water in from the right: 0.15 puts the frame's right
+    edge 0.3 of a frame past the end of the shore, which is enough water to read as
+    "it does not start again over there". act_raft_far sits at world 2..3 frames and
+    never comes into view, so nothing contradicts it. */
+ look:0.15,
+ hopW:11,          /* half-width of a hop, in percent of frame */
+ hopH:12,          /* how high he clears, in percent of frame height */
  water:78.4,
- deck:75.4,        /* the raft's walkable top -- floats 3% proud of the waterline */
- logsY:66.5        /* where the three logs rest on the shore */
+ deck:75.4         /* the raft's walkable top -- floats 3% proud of the waterline */
 };
 
 /* Jhumru's sprite modes. Every entry declares its own box aspect and its own

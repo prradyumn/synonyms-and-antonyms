@@ -378,6 +378,17 @@ def build_expressions():
 # the original's size pushes its chin down through row 280, and there is no art
 # below that to meet the body with. A portrait has no body, so the circle can
 # simply be framed above the problem.
+STILL_SRC = 'assets/chars/jhumru_expression_stills_webp (1)'
+STILLS = ['still_neutral', 'still_proud', 'still_think', 'still_wow',
+          'still_ask', 'still_cheer']
+# Measured on still_neutral: mouth red ends by row 355 and the blue strap starts at
+# 350, so 362 crosses flat white shirt and flat strap and NO mouth. This is the seam
+# the old head-layer pack could not have -- its art stopped at 280, mid-mouth. These
+# are complete characters, so the drawing continues well past any seam we pick.
+STILL_SEAM = 362
+STILL_FEATHER = 10
+
+
 def build_stills():
     """One shared body plus a registered head per expression.
 
@@ -475,6 +486,346 @@ def build_stills():
     print(f'       RUNTIME: ar {w/h:.4f}  ax {ax:.4f}  seam {STILL_SEAM}  '
           f'total {total/1024:.0f}KB')
 
+
+GORGE_SRC = 'assets/bg/gorge-src/png'
+GORGE_ACT = ['act_gorge_near', 'act_gorge_span', 'act_gorge_far']
+GORGE_EDGE = 64      # columns of alpha fade at each plate's left and right edge
+
+
+def ride_top(a, x, run=14, need=10, y_from=280):
+    """Top of the RIDEABLE surface in column x -- ochre earth or plank wood.
+
+    Two cheaper tests were tried and both fail on a full scene plate. Topmost
+    opaque finds the rope handrail, an 8px band 40px above the deck. Topmost solid
+    body finds tree canopy, which on the far plate sits at 26% and put the profile
+    240px above the path. Colour is what separates the surface from everything
+    standing on or above it: the path is warm ochre and the deck is warm plank,
+    while the foliage is green and the rock is grey. Same approach that found the
+    bank's path height for the opening.
+
+    `need` of the next `run` rows must match too, so a warm pixel inside a leaf
+    cluster cannot be mistaken for ground."""
+    col = a[:, x]
+    R, G, B, A = col[:, 0], col[:, 1], col[:, 2], col[:, 3]
+    warm = (A > 200) & (R > 135) & (R - B > 45) & (G < R * 0.92) & (G > R * 0.38)
+    for y in range(y_from, a.shape[0] - run):
+        if warm[y] and warm[y:y + run].sum() >= need:
+            return y
+    return None
+
+
+def band_top(a, x, minrun=40):
+    """Top of the LONGEST warm run in column x. For the approach plate.
+
+    There the path and the earth beneath it form one tall warm band, so its top is
+    the surface, and the short warm patches that fooled ride_top -- a rock sitting
+    above the path, a warm bit of distant canopy -- lose to it on length. It is the
+    wrong detector for the far plate, where a foreground bush hides the path and the
+    longest warm run is the ground BEHIND it, 160px too low."""
+    col = a[:, x]
+    R, G, B, A = col[:, 0], col[:, 1], col[:, 2], col[:, 3]
+    warm = (A > 200) & (R > 110) & (R - B > 35) & (G < R * 0.95) & (G > R * 0.30)
+    best_len, best_y, st = 0, None, None
+    for y in range(len(warm)):
+        if warm[y] and st is None:
+            st = y
+        elif not warm[y] and st is not None:
+            if y - st > best_len: best_len, best_y = y - st, st
+            st = None
+    if st is not None and len(warm) - st > best_len:
+        best_len, best_y = len(warm) - st, st
+    return best_y if best_len >= minrun else None
+
+
+# Which surface detector suits each plate, and which way its surface is allowed to
+# go. Neither detector works everywhere -- see the docstrings -- and the span needs
+# neither, because its deck is flat and measured. The monotonic constraint is design,
+# not a guess: the approach only ever climbs and the far side only ever eases down,
+# so a point that reverses is a misread and gets clamped to its neighbour. Without
+# it the approach's last points read 85% and 88% where the art is at 67%.
+GORGE_SURF = {'act_gorge_near': ('band', 'up'),
+              'act_gorge_span': ('flat', None),
+              'act_gorge_far':  ('ride', 'down')}
+
+
+def gorge_profile(a, name, pts=33):
+    """A surface profile for one plate, using the detector that suits it."""
+    how, mono = GORGE_SURF.get(name, ('ride', None))
+    w = a.shape[1]
+    if how == 'flat':
+        deck = ride_top(a, w // 4)
+        return [deck / a.shape[0] * 100] * pts
+    # Primary detector, with the other one as fallback. band_top returns nothing
+    # over the approach's bridge stub, where the monotonic clamp then froze the last
+    # six points ~15px below the art; ride_top reads that stretch fine.
+    first = band_top if how == 'band' else ride_top
+    other = ride_top if how == 'band' else band_top
+    raw = []
+    for i in range(pts):
+        x = min(w - 1, round(i * (w - 1) / (pts - 1)))
+        v = first(a, x)
+        raw.append(v if v is not None else other(a, x))
+    v = np.array([np.nan if r is None else r / a.shape[0] * 100 for r in raw])
+    out = v.copy()
+    for i in range(len(v)):                       # median-3: kill lone outliers
+        win = v[max(0, i - 1):i + 2]; win = win[~np.isnan(win)]
+        if len(win): out[i] = float(np.median(win))
+    good = out[~np.isnan(out)]
+    out = np.where(np.isnan(out), np.median(good), out)
+    if mono == 'up':     out = np.minimum.accumulate(out)   # climbing: y only falls
+    elif mono == 'down': out = np.maximum.accumulate(out)   # easing: y only rises
+    return list(out)
+
+
+def build_gorge():
+    """Convert the Broken Bridge plates and MEASURE what the runtime needs.
+
+    Three things are measured rather than taken from the delivered JSON, because
+    the drawing is what the rider has to sit on:
+
+      * the rideable surface profile of each plate, so his height follows the art
+        the way it follows the ramp;
+      * the real gap edges from the alpha -- the splintered plank ends run back
+        further than the nominal 864-1056, so the true opening is wider;
+      * the deck height either side of each plate join, to catch a step."""
+    src = ROOT / GORGE_SRC
+    if not src.exists():
+        print('skip gorge (no plates)'); return
+    prof = {}
+    for name in GORGE_ACT + ['mid_gorge']:
+        p_in = src / f'{name}.png'
+        if not p_in.exists():
+            print('skip (missing)', name); continue
+        im = Image.open(p_in).convert('RGBA')
+        if name in GORGE_ACT:
+            # Each plate is cropped square at its own edges, and the runtime now
+            # OVERLAPS them, so a plate's hard left edge lands in the middle of its
+            # neighbour's art -- where a rim block ending in a straight vertical line
+            # across open sky is the most obvious thing on screen. Fading the outer
+            # columns lets one plate settle into the other. The deck starts well
+            # inside the fade on every plate, so nothing rideable is softened.
+            a = np.array(im).astype(float)
+            # Feather only the edges that FACE ANOTHER PLATE. Fading a world's
+            # OUTERMOST edge has nothing to blend into: at the raft bank the leftmost
+            # 64 columns dissolved into the sky and read as a copy-pasted cutout with
+            # a soft border round it.
+            idx = GORGE_ACT.index(name)
+            for i in range(GORGE_EDGE):
+                k = (i + 1) / GORGE_EDGE
+                if idx > 0:                a[:, i, 3] = a[:, i, 3] * k
+                if idx < len(GORGE_ACT) - 1:  a[:, -1 - i, 3] = a[:, -1 - i, 3] * k
+            im = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')
+        dst = BG / f'{name}.webp'
+        im.save(dst, 'WEBP', quality=76, method=6)
+        print('gorge', f'{name:16s}', im.size, f'{dst.stat().st_size / 1024:.0f}KB')
+        if name in GORGE_ACT:
+            a = np.array(im).astype(int)
+            prof[name] = [ride_top(a, min(im.width - 1, round(i * im.width / 16)))
+                          for i in range(17)]
+    pl = src / 'prop_plank.png'
+    if pl.exists():
+        im = Image.open(pl).convert('RGBA')
+        im.save(CH / 'prop_plank.webp', 'WEBP', quality=88, method=6)
+        print('gorge', f'{"prop_plank":16s}', im.size,
+              f'{(CH / "prop_plank.webp").stat().st_size / 1024:.0f}KB')
+
+    print('\n       SURFACE PROFILE (fraction of frame height, 17 points L->R)')
+    for name, ys in prof.items():
+        txt = ','.join('null' if y is None else f'{y / 1080:.4f}' for y in ys)
+        print(f'       {name}\n         [{txt}]')
+
+    span = np.array(Image.open(src / 'act_gorge_span.png').convert('RGBA')).astype(int)
+    deck = ride_top(span, 400)
+    row = span[deck + 6, :, 3] > 8
+    runs, st = [], None
+    for x in range(span.shape[1]):
+        if not row[x] and st is None: st = x
+        elif row[x] and st is not None:
+            if x - st > 40: runs.append((st, x - 1))
+            st = None
+    print(f'\n       deck surface y={deck} ({deck / 1080 * 100:.1f}%); '
+          f'gap in the alpha: {runs}')
+    if runs:
+        g0, g1 = runs[0]
+        print(f'       -> GAP {g0}-{g1} = {g1 - g0 + 1}px ({100 * g0 / 1920:.1f}%'
+              f'-{100 * g1 / 1920:.1f}%), delivered spec said 864-1055 (192px)')
+
+    print('\n       JOINS (deck/ground height either side)')
+    for i in range(len(GORGE_ACT) - 1):
+        A = np.array(Image.open(src / f'{GORGE_ACT[i]}.png').convert('RGBA')).astype(int)
+        B = np.array(Image.open(src / f'{GORGE_ACT[i + 1]}.png').convert('RGBA')).astype(int)
+        ea = [v for v in (ride_top(A, x) for x in range(A.shape[1] - 24, A.shape[1])) if v]
+        eb = [v for v in (ride_top(B, x) for x in range(0, 24)) if v]
+        if ea and eb:
+            print(f'       {GORGE_ACT[i]} y{np.mean(ea):.0f} -> '
+                  f'{GORGE_ACT[i + 1]} y{np.mean(eb):.0f}   '
+                  f'step {np.mean(eb) - np.mean(ea):+.0f}px')
+
+
+RAFT_SRC = 'assets/bg/raft-src'
+RAFT_ACT = ['act_raft_bank', 'act_raft_open', 'act_raft_far']
+# How the shore ENDS on the right. The plate is a full-frame background with an edge
+# occluder drawn at each side, so its right edge is a straight cut through a plant
+# cluster and the earth band -- fine when another plate butts it, obviously sliced
+# when the world stops there over open water. Nothing in code can invent the
+# shoreline that was never drawn, but the land can be made to taper into the water,
+# which reads as a spit instead of a slice.
+RAFT_TAPER = 420        # columns over which the land narrows away
+RAFT_TAPER_POW = 0.7    # <1 keeps it wide then draws out a long thin tip
+
+
+def taper_shore(a):
+    """Wedge the bank's right end down into the water.
+
+    Two steps, and the order matters. First everything ABOVE the earth band goes
+    across the whole zone -- the plant cluster and the rock, removed whole. Letting
+    the taper line do that instead cut the rock in half, because a diagonal through a
+    solid object reads as a sliced object, while the same diagonal through flat earth
+    reads as a bank edge. The zone starts left of the rock for that reason.
+
+    Then the band's top slides down to the waterline so it pinches shut. A low
+    frequency wobble keeps the edge off a ruler-straight diagonal. No feather is
+    needed: the band reaches zero height on its own, so there is no stub to hide."""
+    W = a.shape[1]
+    x0 = W - RAFT_TAPER
+    col = np.where(a[:, x0 - 24, 3] > 8)[0]        # measured, not assumed
+    top0, water = int(col.min()), int(col.max())
+    a[:top0, x0:, 3] = 0                            # plants and rock, whole
+    for i in range(RAFT_TAPER):
+        t = (i + 1) / RAFT_TAPER
+        wob = 7 * math.sin(i / 46.0) + 4 * math.sin(i / 17.0)
+        cut = int(top0 + (water - top0) * (t ** RAFT_TAPER_POW) + wob)
+        a[:max(0, cut), x0 + i, 3] = 0
+    return a, top0, water
+
+
+RAFT_PROPS = ['water_far', 'water_near', 'near_reeds', 'raft_fused', 'raft_stepped',
+              'prop_log_smooth', 'prop_log_ridged', 'prop_log_moss', 'fx_splash']
+
+
+def flood_from_edge(mask):
+    """The part of `mask` that touches an image edge.
+
+    Matte and sky both have to go, and both are distinguished from art by being
+    connected to the border rather than by their colour: the plates contain plenty
+    of legitimate near-white highlight and plenty of blue that is not sky. A flood
+    from the edge removes the export padding and the painted sky without punching
+    holes in anything interior."""
+    lab, _ = ndimage.label(mask)
+    edge = set(lab[0]) | set(lab[-1]) | set(lab[:, 0]) | set(lab[:, -1])
+    edge.discard(0)
+    return np.isin(lab, list(edge))
+
+
+def strip_plate(a, sky=True):
+    """Remove the white export padding, and optionally the painted sky.
+
+    The plates arrived with 15-40% of their pixels as flat white padding where
+    transparency was specified -- the same class of delivery error as the
+    expression pack's feather, but this one is recoverable because the padding is
+    a flat colour the art never uses.
+
+    Two white passes: the first at 238 takes the bulk, the second at 216 takes the
+    ragged fringe it leaves along the waterline, which a single threshold cannot
+    reach without eating into the shore itself."""
+    R, G, B, A = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    for thresh in (238, 216):
+        white = (A > 100) & (R > thresh) & (G > thresh) & (B > thresh)
+        a[..., 3] = np.where(flood_from_edge(white), 0, a[..., 3])
+        A = a[..., 3]
+    if sky:
+        # Sky on the action plane would travel at 1.00 against far_sky's 0.20 and
+        # cover it entirely. Blue-dominant and light, flooded from the top edge.
+        blue = (A > 100) & (B - R > 18) & (B > 150)
+        a[..., 3] = np.where(flood_from_edge(blue), 0, a[..., 3])
+        A = a[..., 3]
+    # Whatever near-white survives the floods is an ISLAND of padding, cut off from
+    # the edge once its neighbours went. On act_raft_far that left a checkerboard of
+    # ~30px squares across the water. Nothing in these plates is legitimately this
+    # white -- the rock is 180, the path is ochre, the foliage green -- so the
+    # remainder goes unconditionally.
+    a[..., 3] = np.where((A > 8) & (R >= 232) & (G >= 232) & (B >= 232), 0, a[..., 3])
+    return a
+
+
+def build_raft():
+    """Convert the Raft Building set and measure what the runtime needs.
+
+    act_raft_open is emptied on purpose. It arrived painted as a full background --
+    sky and a distant treeline -- but the middle of the river already has a distant
+    treeline from mid_canopy at 0.50 and a reed line from water_far at 0.62, and
+    anything left on the action plane there would travel at 1.00 and read as the far
+    bank rushing past a raft that is barely moving. The segment stays in the list as
+    a spacer so the camera still has two screens of travel to cross."""
+    src = ROOT / RAFT_SRC
+    if not src.exists():
+        print('skip raft (no pack)'); return
+    total, prof = 0, {}
+    for name in RAFT_ACT:
+        p_in = src / f'{name}.webp'
+        if not p_in.exists():
+            print('skip (missing)', name); continue
+        im = Image.open(p_in).convert('RGBA')
+        a = strip_plate(np.array(im).astype(int), sky=True)
+        if name == 'act_raft_open':
+            a[..., 3] = 0                      # spacer -- see the docstring
+        if name == 'act_raft_bank':
+            a, t0, wl = taper_shore(a)
+            print(f'       shore tapers over the last {RAFT_TAPER} columns, '
+                  f'band top {t0} down to the waterline {wl}')
+        # Feather only an edge that meets REAL ART on the other side. Two ways that
+        # goes wrong here: a world's outermost edge has nothing to blend into (the
+        # bank's leftmost 64 columns dissolved into the sky and read as a
+        # copy-pasted cutout), and an edge facing the empty spacer has nothing
+        # either -- there the plate's half-trunk faded into the river and looked
+        # like a ghost tree. So a neighbour that is the spacer counts as no
+        # neighbour, which for this set means no feathering at all.
+        idx = RAFT_ACT.index(name)
+        solid = lambda j: 0 <= j < len(RAFT_ACT) and RAFT_ACT[j] != 'act_raft_open'
+        for i in range(GORGE_EDGE):
+            k = (i + 1) / GORGE_EDGE
+            if solid(idx - 1): a[:, i, 3] = a[:, i, 3] * k
+            if solid(idx + 1): a[:, -1 - i, 3] = a[:, -1 - i, 3] * k
+        out = Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')
+        dst = BG / f'{name}.webp'
+        out.save(dst, 'WEBP', quality=76, method=6)
+        total += dst.stat().st_size
+        rows = np.where((a[..., 3] > 8).sum(axis=1) > a.shape[1] * 0.2)[0]
+        span = f'rows {rows.min()}-{rows.max()} ({100*rows.min()/1080:.0f}-{100*rows.max()/1080:.0f}%)' \
+            if len(rows) else 'empty (spacer)'
+        print('raft ', f'{name:16s}', out.size, f'{dst.stat().st_size/1024:.0f}KB   {span}')
+        if name == 'act_raft_bank':
+            prof[name] = [ride_top(a, min(a.shape[1]-1, round(i*(a.shape[1]-1)/32)), y_from=400)
+                          for i in range(33)]
+
+    for name in RAFT_PROPS:
+        p_in = src / f'{name}.webp'
+        if not p_in.exists():
+            print('skip (missing)', name); continue
+        im = Image.open(p_in).convert('RGBA')
+        a = np.array(im).astype(int)
+        # The water bands and the reeds are NOT stripped. They arrived clean -- zero
+        # white matte rows -- and running the flood over them ate the white ripple
+        # HIGHLIGHTS, which form a connected network reaching the edge, leaving a
+        # lace of holes across the river. Only the act plates carry padding.
+        dst = (BG if name.startswith(('water', 'near')) else CH) / f'{name}.webp'
+        Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA') \
+             .save(dst, 'WEBP', quality=82, method=6)
+        total += dst.stat().st_size
+        print('raft ', f'{name:16s}', im.size, f'{dst.stat().st_size/1024:.0f}KB')
+
+    bank = prof.get('act_raft_bank')
+    if bank:
+        v = np.array([np.nan if r is None else r/1080*100 for r in bank])
+        for i in range(len(v)):                      # median-3, as the gorge does
+            w = v[max(0, i-1):i+2]; w = w[~np.isnan(w)]
+            if len(w): v[i] = float(np.median(w))
+        good = v[~np.isnan(v)]
+        v = np.where(np.isnan(v), np.median(good), v)
+        print('\n       BANK SURFACE (percent of frame height, 33 points L->R)')
+        print('       [' + ','.join(f'{x:.2f}' for x in v) + ']')
+        print(f'       ends at {v[-1]:.2f}%   waterline spec 78%')
+    print(f'       total {total/1024:.0f}KB')
 
 def build_ramp():
     """Convert the ramp plate to WebP and MEASURE its surface.

@@ -77,7 +77,12 @@ function pxBuild(f0,o){
  /* One trunk laid over each segment join. Both plates carry a full-height edge
     trunk, so where two segments butt you get two HALF trunks on a hard vertical
     edge plus a tonal step; one trunk spanning the join reads as scenery. */
- const joins=laps.length?[]:segs.slice(1).map(()=>{
+ /* Join trunks cover the seam where two painted plates butt. They are wrong when
+    there is no seam: the raft world's middle segment is an empty spacer, so its
+    boundaries have nothing to hide, and the trunk sprite -- feathered, since it is
+    built to blend -- laid a translucent tree across the open river. `nojoin` opts
+    out; overlaps already do. */
+ const joins=(laps.length||o.nojoin)?[]:segs.slice(1).map(()=>{
   const t=el('<div></div>');
   t.style.cssText='position:absolute;top:0;height:100%;background-size:100% 100%;'
    +'background-repeat:no-repeat;background-image:url('+A.join_trunk+')';
@@ -171,6 +176,15 @@ function mkActor(modes,defKey,rider){
  /* A point on the sprite box, given as fractions of it, expressed as percentages
     of the FRAME -- which is what transform-origin on #stage wants. The handlebar
     grip measured off the sprite is (0.77, 0.56). */
+ /* Airborne: `a` is 0 on the ground to 1 at the apex, `tilt` in degrees. The shadow
+    shrinking and lifting away is what sells a jump -- a sprite that rises with its
+    shadow nailed under it reads as an elevator, not a hop. */
+ o.air=(a,tilt)=>{
+  const sh=w.querySelector('.cycsh');
+  if(sh){sh.style.opacity=String(1-0.7*a);
+         sh.style.transform='scale('+(1-0.28*a)+')'}
+  o.img.style.transform=a?'rotate('+tilt.toFixed(1)+'deg)':'';
+ };
  o.at=(fx,fy)=>{
   const r=w.getBoundingClientRect(),f=F.getBoundingClientRect();
   return [100*(r.x-f.x+fx*r.width)/f.width, 100*(r.y-f.y+fy*r.height)/f.height];
@@ -606,7 +620,7 @@ function gorge(){
    a timer, which is enough to see whether the location reads. */
 function river(){
  clean();window.__scene='river';
- const rig=pxBuild(0,{segs:RAFT.seg,mids:RAFT.mids,front:RAFT.front});
+ const rig=pxBuild(0,{segs:RAFT.seg,mids:RAFT.mids,back:RAFT.back,front:RAFT.front,nojoin:1});
  const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
  RELAY=()=>{rig.layout();J.layout()};
 
@@ -614,45 +628,66 @@ function river(){
  /* the river keeps moving between beats, not only while the camera does */
  (function flow(){if(window.__scene!=='river')return;rig.flow();requestAnimationFrame(flow)})();
 
- /* three logs on the shore, evenly spaced across the middle of the plate */
- const logs=['log_a','log_b','log_c'].map((k,i)=>{
-  const e=el('<img class="logp" src="'+A[k]+'">');
-  rig.segs[0].appendChild(e);e.dataset.i=i;return e});
- /* Placed by their BOTTOM edge, not their top: the art is 3:1, so a log is w/3
-    tall, and resting it on the shore means top = shore - w/3. Placed by top they
-    hung 4% below the surface and read as sunk into the slope.
-    They start at 52% so they are laid out AHEAD of him -- he stops at HOLD_X 42%
-    and was otherwise riding through the first one. */
- const placeLogs=()=>{
-  const Fw=F.clientWidth,Fh=F.clientHeight,w=U(300),h=w/3;
-  logs.forEach((e,i)=>{
-   e.style.cssText='position:absolute;z-index:3;width:'+w+'px;pointer-events:none;'
-    +'left:'+((0.52+i*0.16)*Fw-w/2)+'px;top:'+(RAFT.logsY/100*Fh-h)+'px';
-  });
- };
- placeLogs();
- const relay0=RELAY;RELAY=()=>{relay0();placeLogs()};
+ /* No log props: the plate already carries three, and adding more made six. When
+    the word game needs individually choosable logs they can be overlaid then. */
+
 
  J.place(-12,yAt(RAFT.shore,0));
- const RIDE=RIDE_IN*1.15;
+ /* Long enough that three hops are all readable. At 1.45 the whole approach was
+    over in a bit more than a second and the jumps flicked past. */
+ const RIDE=RIDE_IN*2.1;
+
+ /* A hop over each painted log. Height comes off a cosine so take-off and landing
+    are smooth, and the tilt follows the direction of travel -- nose up on the way
+    up, nose down coming in -- which is what a bike actually does. */
+ const hop=(x)=>{
+  for(let i=0;i<RAFT.logs.length;i++){
+   const d=(x-RAFT.logs[i])/RAFT.hopW;
+   if(d>-1&&d<1) return [RAFT.hopH*Math.cos(d*Math.PI/2), 15*Math.sin(d*Math.PI/2), i];
+  }
+  return [0,0,-1];
+ };
 
  /* The scene ENDS at the shore. Crossing on the raft is cut until the word game
     exists -- floating away before there is anything to solve made the puzzle look
     like it had already been solved. The raft, the splash and the far bank are all
     built and measured; they come back when the mechanic does. */
+ let landed=-1;
  tween(RIDE,p=>{
-  const x=-12+(HOLD_X+12)*easeRide(p);
-  J.place(x,yAt(RAFT.shore,Math.max(0,x/100)));
+  const x=-12+(RAFT.stop+12)*easeRide(p);
+  const [lift,tilt,i]=hop(x);
+  J.place(x,yAt(RAFT.shore,Math.max(0,x/100))-lift);
+  J.air(lift/RAFT.hopH,tilt);
+  if(i>=0&&lift<RAFT.hopH*0.25&&tilt>0&&landed!==i){landed=i;tone(210,.09)}
  },()=>{
+  J.air(0,0);
   J.show('still');J.riding(0);tone(430,.12);
   later(()=>{J.face('wow');ask('A river! It is far too wide to ride across.','jhu')},300);
-  later(()=>{J.face('think');ask('Three logs. Two of them belong together.','jhu')},300+LINE);
+  /* Look downstream. He holds his WORLD position while the camera drifts on, so he
+     slides left across the frame and open water comes in from the right.
+
+     This only works because taper_shore() gives the bank a real ending. Panning used
+     to bring the plate's straight right edge into shot -- a cut through a plant
+     cluster that read as a sliced cutout, and neither feathering it nor capping it
+     with mirrored foliage helped, because both just moved the cut somewhere else.
+     mid_canopy is dropped for this scene too, so there is no treeline on the horizon
+     to contradict "no land". */
   later(()=>{
-   F.appendChild(el('<div class="over card"><h3>The River</h3>'
+   J.face('think');
+   tween(LEG*0.9,q=>{
+    const f=RAFT.look*easeOut(q);
+    rig.setF(f);
+    J.place(RAFT.stop-f*200,yAt(RAFT.shore,RAFT.stop/100));
+   });
+  },300+LINE*0.8);
+  later(()=>ask('There is no land on the other side. Only water.','jhu'),300+LINE*1.6);
+  later(()=>{J.face('proud');ask('But three logs... two of them belong together.','jhu')},300+LINE*2.6);
+  later(()=>{
+   F.appendChild(el('<div class="over card ask"><h3>The River</h3>'
     +'<p>The word game goes here.<br>Two logs that mean the same make one raft.</p>'
     +'<button class="btn">Back to the start</button></div>'));
    F.querySelector('.btn').onclick=()=>title();
-  },300+LINE*2+400);
+  },300+LINE*3.8);
  });
 }
 /* Press R to jump straight to the river while it is being built. */
