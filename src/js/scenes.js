@@ -386,14 +386,25 @@ function hook(){
  /* Plays one stop of HOOK. Each line carries its own voice and optional cue, and
     the stop's length falls out of how many lines it has -- so the script can grow
     or shrink in levels.js without touching any timing here. */
- const say=(lines,t0)=>{
-  lines.forEach((l,i)=>later(()=>{
-   ask(l.line,l.who);if(J&&l.face)J.face(l.face);
+ /* Plays one stop, ONE LINE AT A TIME, each waiting for its own speech to finish
+    before the next begins, and calling `done` when the stop is over. It used to fire
+    every line on a fixed LINE interval and return a precomputed duration, which is
+    why long lines were talked over and the camera left before anyone had finished.
+    GAP is the breath between lines. */
+ const GAP=520;
+ const say=(lines,done)=>{
+  let i=0;
+  (function step(){
+   if(i>=lines.length){if(done)done();return}
+   const l=lines[i++];
+   if(J&&l.face)J.face(l.face);
+   /* `ask` waits for the QUESTION to be spoken before the Yes button appears --
+      offered at the same moment as the line, a child can answer before hearing what
+      was asked, and the line was measured on screen for 450ms. */
+   ask(l.line,l.who,l.fx==='ask'?askToCome:()=>later(step,GAP));
    if(l.fx==='bell')bellBeat();
    if(l.fx==='map')trailMap();
-   if(l.fx==='ask')askToCome();
-  },t0+i*LINE));
-  return Math.max(LINE,lines.length*LINE);
+  })();
  };
  /* "Tring! Tring!" -- the one place the camera goes in close on a detail rather
     than on him. He is stopped, the line is about the bicycle, and the bell is a
@@ -430,8 +441,7 @@ function hook(){
   F.appendChild(c);
   c.querySelector('.btn').onclick=e=>{
    e.stopPropagation();c.remove();
-   say(HOOK.go,0);
-   later(gorge,Math.max(LINE,HOOK.go.length*LINE)+200);
+   say(HOOK.go,()=>later(gorge,500));
   };
  }
 
@@ -453,16 +463,19 @@ function hook(){
   J.place(-14,GROUND1);
   RELAY=()=>{rig.layout();J.layout()};
 
-  let t=0;
-  /* ---- stop 1: the near bank ---- */
+  /* A CHAIN, not a timeline. Every stop hands on when its dialogue has actually
+     finished, so no line is ever cut off and no leg starts over the top of one.
+     The old version added up LINE * (number of lines) in advance, which only
+     worked while every line was assumed to take the same time to say. */
   J.riding(1);
-  tween(RIDE_IN,p=>J.place(-14+(HOLD_X+14)*easeRide(p),GROUND1),
-        ()=>{J.show('still');J.riding(0);tone(430,.12)});
-  t=RIDE_IN;t+=say(HOOK.bank,t);
+  tween(RIDE_IN,p=>J.place(-14+(HOLD_X+14)*easeRide(p),GROUND1),()=>{
+   J.show('still');J.riding(0);tone(430,.12);
+   later(()=>say(HOOK.bank,legA),400);
+  });
 
-  /* ---- leg A: ride to the middle of the bridge ---- */
-  later(()=>{
-   say(HOOK.legA,0);                                 /* spoken as he pedals off */
+  /* ---- leg A: up the ramp to the middle of the bridge ---- */
+  function legA(){
+   say(HOOK.legA);                                  /* spoken as he pedals off */
    J.show('cyc');J.riding(1);
    const runA=wheelieRun(J,rA,c=>c/.5);
    /* The ramp is bedded, so its base sits 2px below the bank and its crest 6px
@@ -478,18 +491,14 @@ function hook(){
     rig.setF(p*.5);
     J.place(HOLD_X,yA(rA.u(p*.5,J.wheelDX())));
     runA(p);
-   },()=>{J.img.style.transform=''});  },t);
-  t+=LEG;
+   },()=>{
+    J.img.style.transform='';J.show('still');J.riding(0);tone(430,.12);
+    later(()=>say(HOOK.bridge,()=>later(legB,MAP_LIFE*0.55)),400);
+   });
+  }
 
-  /* ---- stop 2: he stops midspan and speaks, alone ---- */
-  later(()=>{J.show('still');J.riding(0);tone(430,.12)},t);
-  /* The map pops on the last line of this stop, so the stop has to outlast it --
-     otherwise leg B starts while the card is still on screen. */
-  t+=Math.max(say(HOOK.bridge,t),
-              (HOOK.bridge.length-1)*LINE+MAP_LIFE+MAP_FADE+150);
-
-  /* ---- leg B: both travel on to the clearing ---- */
-  later(()=>{
+  /* ---- leg B: on to the clearing. Waits for the map to clear. ---- */
+  function legB(){
    J.show('cyc');J.riding(1);
    /* Deck height until the bridge ends, then a smooth ease down to the clearing.
       DECK_OFF is where his wheel leaves the deck, measured as a fraction of leg B. */
@@ -499,13 +508,11 @@ function hook(){
     const y=p<=DECK_OFF ? DECK
           : DECK+(GROUND3-DECK)*easeOut(Math.min(1,(p-DECK_OFF)/(LAND-DECK_OFF)));
     J.place(HOLD_X,y);
-   },()=>{J.img.style.transform=''});  },t);
-  t+=LEG;
-
-  /* ---- stop 3: the clearing. He turns to the player. ---- */
-  later(()=>{J.show('still');J.riding(0);tone(430,.12)},t);
-  t+=SETTLE;
-  say(HOOK.clearing,t);   /* ends on 'Will you come?' -- askToCome() takes over */
+   },()=>{
+    J.img.style.transform='';J.show('still');J.riding(0);tone(430,.12);
+    later(()=>say(HOOK.clearing),SETTLE);   /* ends on 'Will you come?' */
+   });
+  }
  }
 }
 

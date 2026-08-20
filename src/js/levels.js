@@ -173,19 +173,21 @@ const RIDER={
    another line changes it, so a stop only names an expression when it turns.
    Narrator lines carry one too -- he is on screen being talked about. */
 const HOOK={
- /* stop 1 -- the near bank, he introduces himself and his bicycle */
+ /* stop 1 -- the near bank. Four lines, because the script says "Today, I'm going
+    on a jungle adventure journey!" BEFORE the direction "[He climbs onto his
+    bicycle and begins to pedal.]" -- so it belongs to the stop, not to the ride. */
  bank:[{who:'nar',line:'Jhumru was setting off on an exciting adventure through the jungle on his new bicycle.',face:'neutral'},
        {who:'jhu',line:'Hello, everyone! Have you seen my new bicycle?',face:'neutral'},
-       {who:'jhu',line:'Tring! Tring! Look at it! It is shiny! It is bright! It is sparkling!',fx:'bell',face:'proud'}],
- /* leg A -- he climbs on and pedals off, up the ramp onto the bridge */
- legA:[{who:'jhu',line:'Today, I am going on a jungle adventure journey!'}],
- /* stop 2 -- midway across the bridge, the trail map appears */
- bridge:[{who:'jhu',line:'I wonder what we will find along the way!',face:'think'},
-         {who:'jhu',line:'Oh! The jungle path looks full of surprises and challenges.',fx:'map',face:'wow'}],
- /* stop 3 -- the clearing. He turns to the player and waits to be answered. */
+       {who:'jhu',line:"Tring! Tring! Look at it! It's shiny! It's bright! It's sparkling!",fx:'bell',face:'proud'},
+       {who:'jhu',line:"Today, I'm going on a jungle adventure journey!",face:'cheer'}],
+ /* leg A -- spoken while he pedals, per "[He climbs onto his bicycle...]" */
+ legA:[{who:'jhu',line:"I wonder what we'll find along the way!"}],
+ /* stop 2 -- midway across the bridge, where the trail map appears */
+ bridge:[{who:'jhu',line:'Oh! The jungle path looks full of surprises and challenges.',fx:'map',face:'wow'}],
+ /* stop 3 -- he turns to the children and waits to be answered */
  clearing:[{who:'jhu',line:'Will you come on this adventure with me?',fx:'ask',face:'ask'}],
- /* and once they say yes */
- go:[{who:'nar',line:'Wonderful! Let us go!',face:'cheer'}]
+ /* and once they say Yes */
+ go:[{who:'nar',line:"Wonderful! Let's go!",face:'cheer'}]
 };
 
 /* ---------------------------------------------------------------------------

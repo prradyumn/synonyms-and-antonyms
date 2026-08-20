@@ -35,10 +35,19 @@ function kill(){T=[]}
  requestAnimationFrame(clock);
  if(lastRAF){const dt=now-lastRAF;if(!PAUSED)VT+=dt>120?120:dt}
  lastRAF=now;
- for(let i=T.length-1;i>=0;i--){
-  const q=T[i];
-  if(q.g!==GEN){T.splice(i,1);continue}
-  if(VT>=q.t){if(q.every)q.t=VT+q.every;else T.splice(i,1);q.f()}
+ /* Iterate a SNAPSHOT. A callback can change scene, and clean() calls kill() which
+    empties T -- indices then shift under a live loop and T[i] comes back undefined.
+    That threw "reading 'g'" once the dialogue chain started handing scenes over from
+    inside a timer, which it now does at every stop. */
+ const due=T.slice();
+ for(let i=0;i<due.length;i++){
+  const q=due[i];
+  if(!q||q.g!==GEN){const j=T.indexOf(q);if(j>=0)T.splice(j,1);continue}
+  if(VT>=q.t){
+   if(q.every)q.t=VT+q.every;
+   else{const j=T.indexOf(q);if(j>=0)T.splice(j,1)}
+   q.f();
+  }
  }
 })(0);
 
@@ -110,7 +119,26 @@ addEventListener('pointerdown',audioStart,{once:true});
 addEventListener('keydown',audioStart,{once:true});
 
 let said='';
-function speak(t,who){said=t;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);
+/* A line has to be allowed to FINISH. Dialogue used to advance on a fixed 2.2s
+   interval whatever the line said, so the long ones were cut off mid-word and the
+   camera moved on over the top of them. `done` fires when the utterance actually
+   ends.
+
+   The length-based fallback is not belt-and-braces, it is the common case:
+   speechSynthesis never fires `end` when it is muted, blocked by autoplay policy,
+   or has no voice installed, and without it the whole chain would simply stop. A
+   token guards against speechSynthesis.cancel() firing `end` on the line we just
+   replaced and advancing the chain twice. */
+let SPTOK=0;
+function speak(t,who,done){
+ said=t;
+ const tok=++SPTOK;
+ const words=(String(t).match(/\S+/g)||[]).length;
+ let fired=false;
+ const finish=()=>{if(fired||tok!==SPTOK)return;fired=true;if(done)done()};
+ const guard=later(finish,Math.max(1500,words*430)+500);
+ try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);
+ u.onend=()=>{cancel(guard);finish()};
  /* the narrator sits lower and slower than Jhumru, so a child can tell who is
     talking without being told */
  u.rate=who==='nar'?.66:.72;u.pitch=who==='nar'?.82:1.12;const v=speechSynthesis.getVoices().find(v=>/en-IN|India/i.test(v.lang+v.name))||speechSynthesis.getVoices().find(v=>/^en/i.test(v.lang));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
@@ -124,7 +152,7 @@ $('#mute').onclick=()=>{
  muted=!muted;Object.values(SND).forEach(a=>{a.muted=muted});
  if(muted){hushAll();audioLive(false)}else play('bgm');
 };
-function ask(t,who){$('#asktxt').textContent=t;speak(t,who)}
+function ask(t,who,done){$('#asktxt').textContent=t;speak(t,who,done)}
 function el(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function svg(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function clean(){GEN++;kill();RELAY=null;foff();camReset();stopSnd('bike');fade('river',0,700);FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
