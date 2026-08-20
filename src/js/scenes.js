@@ -821,10 +821,13 @@ function river(){
    J.place(RAFT.stop-f*200,yAt(RAFT.shore,RAFT.stop/100));
   });
   const card=()=>later(()=>{
+   /* Hurdle two hands on to hurdle three. Every scene until this one was reachable
+      only by a dev key, so playing normally you never saw it -- which is how the river
+      stayed invisible to every test that jumped straight to it. */
    F.appendChild(el('<div class="over card ask"><h3>The River</h3>'
     +'<p>The word game goes here.<br>Two logs that mean the same make one raft.</p>'
-    +'<button class="btn">Back to the start</button></div>'));
-   F.querySelector('.btn').onclick=()=>title();
+    +'<button class="btn">On to the muddy path</button></div>'));
+   F.querySelector('.btn').onclick=()=>mud();
   },600);
   later(()=>sayWith(J,RIVER.see,null,()=>{
    pan();                                    /* the pan runs UNDER the next line */
@@ -832,11 +835,92 @@ function river(){
   }),300);
  });
 }
+/* ---------- the muddy path ----------
+   Hurdle three, and the last. He rides down the path and it turns to mud.
+
+   The plate stack is the hook's, plus one thing: mud_near at 1.18, a low strip whose
+   near lip passes IN FRONT of his wheels. That occlusion is the scene. A wheel resting
+   on a painting of mud is a sticker; a wheel with the mud's own edge crossing it is in
+   the mud. It is the same lever as the contact shadow that fixed the floating bicycle,
+   and the one water_near was supposed to give the raft and did not, because its paint
+   sat at the bottom of its own canvas instead of at the waterline.
+
+   Ground comes from MUD.prof, measured off the built plates by colour from BELOW. The
+   tyres bed in by MUD.drop, which is 11% of his height rather than the 5% used on
+   planks, because mud is soft. Between the two he sits IN the surface with no new
+   sprite -- there is no sunken-bicycle art and none is needed.
+
+   The mechanic is not here yet: he arrives, sees the mud, and hands on to a card. */
+function mud(){
+ clean();window.__scene='mud';
+ const rig=pxBuild(0,{segs:MUD.seg,mids:MUD.mids,back:MUD.back,front:MUD.front,
+                      laps:MUD.laps,nojoin:MUD.nojoin});
+ const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
+ RELAY=()=>{rig.layout();J.layout()};
+
+ /* The same world arithmetic as the gorge: plates OVERLAP, so a plate's world position
+    is not i*1920, and the later plate is drawn on top -- where two profiles cover the
+    same world x, the later one is the surface he actually rides. Built in order, later
+    points overwriting earlier ones. */
+ const n=MUD.seg.length,laps=MUD.laps;
+ const lapTo=i=>laps.slice(0,i).reduce((a,b)=>a+b,0);
+ const worldW=1920*n-lapTo(n);
+ const track=[];
+ MUD.prof.forEach((pr,i)=>{
+  const left=i*1920-lapTo(i);
+  pr.forEach((y,j)=>{
+   const f=(left+j*1920/(pr.length-1))/worldW;
+   while(track.length&&track[track.length-1][0]>=f-1e-9)track.pop();
+   track.push([f,y]);
+  });
+ });
+ const travel=1920*(n-1)-lapTo(n);
+ const worldAt=f=>(f*travel+HOLD_X/100*1920)/worldW;
+ const drop=(MUD.drop||0)*RIDER.still.hu/1080;
+ const yOf=f=>yAt(track,worldAt(f))+drop;
+
+ /* Stop short of the mud's near edge, which is measured off plate 2's alpha rather
+    than guessed. MUD.stop is a camera fraction. */
+ const stopF=Math.min(1,MUD.stop);
+
+ J.place(-12,yOf(0));
+ let armed=1;
+ const RIDE=RIDE_IN*1.1,RUN=LEG*1.9;
+
+ tween(RIDE,p=>J.place(-12+(HOLD_X+12)*easeRide(p),yOf(0)),()=>{
+  J.riding(1);J.show('cyc');
+  tween(RUN,p=>{
+   const f=stopF*easeOut(p);
+   rig.setF(f);J.place(HOLD_X,yOf(f));
+  },()=>{
+   J.show('still');J.riding(0);tone(430,.12);
+   /* In on the mud, as the gorge does on the gap: this is the obstacle and it has to
+      become the subject before any words arrive. Released before the card, so the
+      hand-over starts from a neutral frame rather than mid-move. */
+   const GFX={};
+   const beat=(lines,next,wait)=>later(()=>sayWith(J,lines,GFX,next),wait||0);
+   const tryIt =()=>beat(MUDTALK.try,turn,400);
+   const turn  =()=>{camTo(1,700);beat(MUDTALK.turn,handOn,300)};
+   const handOn=()=>later(()=>{
+    if(!armed)return;armed=0;
+    F.appendChild(el('<div class="over card"><h3>The Muddy Path</h3>'
+     +'<p>The word game goes here.<br>Two stones that mean the same make one footing.</p>'
+     +'<button class="btn">Back to the start</button></div>'));
+    F.querySelector('.btn').onclick=()=>title();
+   },700);
+   later(()=>camTo(1.15,900,54,70),300);
+   beat(MUDTALK.see,tryIt,700);
+  });
+ });
+ fon('pointerdown',()=>{});
+}
+
 /* Jump keys, DEV ONLY -- R for the river, B for the hurdle, while they are being
    built. Ungated these shipped, so a child leaning on the keyboard mid-story was
    teleported into another scene. */
 if(IS_DEV){
  addEventListener('keydown',e=>{if(e.key==='r'||e.key==='R')river()});
  addEventListener('keydown',e=>{if(e.key==='b'||e.key==='B')gorge()});
+ addEventListener('keydown',e=>{if(e.key==='m'||e.key==='M')mud()});
 }
 

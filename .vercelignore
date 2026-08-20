@@ -18,3 +18,7 @@ prototypes/
 # fetched at runtime -- these six full characters and the zip they arrived in were
 # shipping as 2.5MB of dead weight, a third of the whole bundle.
 assets/chars/jhumru_expression_stills_webp*
+
+# Build inputs for hurdle three. build_mud() turns these into the three
+# act_mud_*.webp plates plus mud_near, the stones and the splashes.
+muddy_path_assets/

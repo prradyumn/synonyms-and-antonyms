@@ -16,6 +16,11 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
          r_far:'assets/bg/act_raft_far.webp',water_far:'assets/bg/water_far.webp',
          water_near:'assets/bg/water_near.webp',near_reeds:'assets/bg/near_reeds.webp',
          bubble:'assets/chars/bubble.webp',
+         m_near:'assets/bg/act_mud_near.webp',m_deep:'assets/bg/act_mud_deep.webp',
+         m_far:'assets/bg/act_mud_far.webp',mud_near:'assets/bg/mud_near.webp',
+         stone_a:'assets/chars/prop_stone_1.webp',stone_b:'assets/chars/prop_stone_2.webp',
+         stone_c:'assets/chars/prop_stone_3.webp',stones_ok:'assets/chars/stones_firm.webp',
+         stones_bad:'assets/chars/stones_sunk.webp',splat:'assets/chars/fx_mud_splat.webp',
          raft:'assets/chars/raft_fused.webp',raft_bad:'assets/chars/raft_stepped.webp',
          log_a:'assets/chars/prop_log_smooth.webp',log_b:'assets/chars/prop_log_ridged.webp',
          log_c:'assets/chars/prop_log_moss.webp',splash:'assets/chars/fx_splash.webp'};
@@ -141,6 +146,59 @@ const RAFT={
  hopH:12,          /* how high he clears, in percent of frame height */
  water:78.4,
  deck:75.4         /* the raft's walkable top -- floats 3% proud of the waterline */
+};
+
+/* ---------------------------------------------------------------------------
+   HURDLE THREE -- the muddy path. Rain has turned a stretch of path to deep mud.
+
+   The plates arrived with everything docs/18 made a hard rule correct -- the overlap
+   bands were pixel-identical, there was no padding, the world edges were hard alpha --
+   but with the whole scene about 28.6% too high and each plate's ground drawn as a
+   thin floating strip, because "everything below 82% must be transparent" was read as
+   "stop the ground". build_mud() shifts them into place, eases out the 41px and 52px
+   ledges each plate had where its copied band ended, and fills the ground body down to
+   88%, behind near_grass. Every number below is printed by that build step.
+   ------------------------------------------------------------------------- */
+const MUD={
+ seg:['m_near','m_deep','m_far'],
+ /* 260 per join, and the overlap band is the SAME art on both plates -- so the join
+    cancels rather than being covered. `nojoin` because a join trunk over a match is
+    the mistake that laid a translucent tree across the river. */
+ laps:[260,260],
+ nojoin:1,
+ /* Measured off the built plates by walking UP from the lowest warm pixel. Measuring
+    down from the top finds trunk bark and greenery, which is how the rider came to
+    float 83px on the bridge approach. A local median per sample, so a rock edge cannot
+    define the ground. */
+ prof:[
+  [75.56,73.80,72.78,72.50,72.41,72.41,72.22,71.94,71.85,72.04,71.94,72.04,71.94,72.04,72.04,72.04,72.04],
+  [72.04,72.04,72.04,70.28,68.80,68.15,68.06,68.06,68.15,68.06,68.06,67.96,68.06,68.15,68.43,68.15,68.15],
+  [68.61,68.15,68.15,70.28,71.94,72.78,72.78,72.50,71.48,70.28,68.89,67.59,66.20,65.37,66.94,68.24,68.43]
+ ],
+ /* How far the tyres bed in, as a percentage of HIS height. 5% is right for planks;
+    mud is soft, and 11% is what puts the contact 3.5% of the frame below the surface. */
+ drop:11,
+ /* The mud itself, as fractions of the whole world -- measured off plate 2's alpha,
+    not taken from the brief. He stops just short of its near edge. */
+ mud:[0.3664,0.6532],
+ stop:0.30,
+ /* The near lip of the mud, passing IN FRONT of his wheels at 1.18. That occlusion is
+    the whole scene: a wheel on a painting of mud is a sticker, a wheel with the mud's
+    edge crossing it is in the mud. water_near was meant to do this for the raft and
+    never did, because its paint sat at the bottom of its own canvas. This one's paint
+    is at rows 127-140 of 400, which lands at 74.7%-76.0% on screen. */
+ mids:[{key:'mud_near',rate:1.18,z:6,strip:400,edge:'bottom',front:1}],
+ back:[['far_sky',0.20],['mid_canopy',0.50]],
+ front:[['near_leaves',1.40,'top',169],['near_grass',1.40,'bottom',236]]
+};
+
+/* Hurdle three's lines. Not from the supplied script, which stops at the broken
+   bridge, so this wording stands until one arrives. */
+const MUDTALK={
+ see:[{who:'jhu',line:'Oh no! The path is thick with mud.',face:'wow'}],
+ try:[{who:'jhu',line:'My wheels are sinking. I cannot ride through this.',face:'think'}],
+ turn:[{who:'nar',line:'Jhumru needed something firm to cross on. Two stones that '
+        +'mean the same thing would make one footing wide enough to hold.',face:'think'}]
 };
 
 /* Jhumru's sprite modes. Every entry declares its own box aspect and its own
