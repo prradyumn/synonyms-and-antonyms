@@ -286,7 +286,12 @@ function title(){
    figure multiplied by it, so raising PACE slows the bicycle, the camera, how long
    each line stays and how long the map holds, all together and in proportion. */
 const PACE=1.45;
-const RIDE_IN=2700*PACE, LEG=4200*PACE, SETTLE=800*PACE, LINE=1550*PACE;
+/* LINE is gone. It was "how long a line of dialogue takes", and every dialogue bug
+   in this game traced back to it: a guessed per-line duration cannot be right for a
+   4-word line and a 24-word line at once, so short lines left dead air and long ones
+   were cut off by the next ask() calling speechSynthesis.cancel(). Every line now
+   ends when its own speech ends. Nothing reads a line duration any more. */
+const RIDE_IN=2700*PACE, LEG=4200*PACE, SETTLE=800*PACE;
 /* how long the trail map stays up, and the fade off it */
 const MAP_LIFE=2600*PACE,MAP_FADE=420;
 const HOLD_X=42;
@@ -388,13 +393,72 @@ function wheelieRun(J,r,legOf){
  };
 }
 
+/* ---------- dialogue, one line at a time ----------
+   Plays a list of scripted lines, each one WAITING for its own speech to finish
+   before the next begins. `done` runs when the list is exhausted.
+
+   It lives at module scope because the hook is not the only scene with a script:
+   the gorge was still firing its lines on a precomputed `700 + LINE * n` timeline,
+   and since ask() -> speak() calls speechSynthesis.cancel() before it starts, a
+   line arriving on a guessed schedule cuts off the one before it. That is what was
+   left of "dialogue doesn't complete" after the hook was chained.
+
+   `fx` is the scene's own cue table, so the gorge can ring a bell without knowing
+   anything about the hook's trail map. A cue may declare:
+     .hold   -- it owns what happens next (the Yes button: nothing advances until
+                the player answers), so the chain stops and the cue takes over
+     .after  -- run once the line has actually FINISHED. The bell's camera release
+                uses this: it used to be scheduled at LINE-800 off the pacing table,
+                which released mid-line the moment a bell line ran long.
+   GAP is the breath between lines. */
+const GAP=520;
+function sayWith(actor,lines,fx,done){
+ let i=0;
+ (function step(){
+  if(i>=lines.length){if(done)done();return}
+  const l=lines[i++];
+  if(actor&&l.face)actor.face(l.face);
+  const cue=(l.fx&&fx)?fx[l.fx]:null;
+  ask(l.line,l.who,(cue&&cue.hold)?cue:()=>{
+   if(cue&&cue.after)cue.after();
+   later(step,GAP);
+  });
+  if(cue&&!cue.hold)cue();
+ })();
+}
+
+/* "Tring! Tring!" -- the one place the camera goes in close on a detail rather than
+   on him. He is stopped, the line is about the bicycle, and the bell is a 14px
+   object on a 1476px frame: without the push there is nothing to look at, and the
+   SFX has to carry the whole beat on its own.
+
+   1.22 is a shade past the 1.15 used at the bridge, which is affordable here
+   because it is brief and the plate behind him is 1920 native. Origin is the
+   handlebar itself, so the grip stays put and the world grows around it.
+
+   Used by both the hook and the bridge, so it takes its actor rather than closing
+   over one, and it releases on `.after` -- when the line ends -- rather than on a
+   guessed duration. */
+function bellCue(get){
+ const run=()=>{
+  play('bell');
+  const actor=get&&get();
+  if(!actor)return;
+  const [ox,oy]=actor.at(0.77,0.56);
+  camTo(1.22,600,ox,oy);
+  const b=svg(bellSVG());actor.w.appendChild(b);
+  later(()=>{if(b.parentNode)b.remove()},1050);      /* 2 x 430ms, plus a tail */
+ };
+ run.after=()=>camTo(1,650);
+ return run;
+}
+
 function hook(){
  clean();window.__scene='hook';
  const g=GEN;
 
  function skip(){gorge()}                 /* clean() drops the listener for us */
  fon('pointerdown',skip);
- const done=()=>gorge();
 
  /* The faces preload with the plates: one arriving late would show a headless body
     for a frame, since the stopped sprite is a body plus a face layer. */
@@ -404,49 +468,14 @@ function hook(){
   .then(()=>{if(g===GEN)roll()});
 
  let J=null;                    /* built by roll() once the plates are in */
- /* Plays one stop of HOOK. Each line carries its own voice and optional cue, and
-    the stop's length falls out of how many lines it has -- so the script can grow
-    or shrink in levels.js without touching any timing here. */
- /* Plays one stop, ONE LINE AT A TIME, each waiting for its own speech to finish
-    before the next begins, and calling `done` when the stop is over. It used to fire
-    every line on a fixed LINE interval and return a precomputed duration, which is
-    why long lines were talked over and the camera left before anyone had finished.
-    GAP is the breath between lines. */
- const GAP=520;
- const say=(lines,done)=>{
-  let i=0;
-  (function step(){
-   if(i>=lines.length){if(done)done();return}
-   const l=lines[i++];
-   if(J&&l.face)J.face(l.face);
-   /* `ask` waits for the QUESTION to be spoken before the Yes button appears --
-      offered at the same moment as the line, a child can answer before hearing what
-      was asked, and the line was measured on screen for 450ms. */
-   ask(l.line,l.who,l.fx==='ask'?askToCome:()=>later(step,GAP));
-   if(l.fx==='bell')bellBeat();
-   if(l.fx==='map')trailMap();
-  })();
- };
- /* "Tring! Tring!" -- the one place the camera goes in close on a detail rather
-    than on him. He is stopped, the line is about the bicycle, and the bell is a
-    14px object on a 1476px frame: without the push there is nothing to look at, and
-    the SFX has to carry the whole beat on its own.
-
-    1.22 is a shade past the 1.15 used at the bridge, which is affordable here
-    because it is brief and the plate behind him is 1920 native. Origin is the
-    handlebar itself, so the grip stays put and the world grows around it. */
- function bellBeat(){
-  play('bell');
-  if(!J)return;
-  const [ox,oy]=J.at(0.77,0.56);
-  camTo(1.22,600,ox,oy);
-  const b=svg(bellSVG());J.w.appendChild(b);
-  later(()=>{if(b.parentNode)b.remove()},1050);       /* 2 x 430ms, plus a tail */
-  /* Out well before he pedals off. The bank stop runs 3 x LINE and the bell is its
-     last line, so releasing at LINE-800 lands the ease 150ms clear of the ride --
-     no scale left moving once the parallax starts. */
-  later(()=>camTo(1,650),LINE-800);
- }
+ /* The hook's cue table. Each line names its own cue in levels.js, so the script can
+    grow or shrink there without touching any timing here. `ask` HOLDS the chain: the Yes button only appears once
+    the question has actually been spoken, because offered alongside the line a
+    child can answer before hearing what was asked -- it was measured on screen for
+    450ms before this was fixed. */
+ const HFX={bell:bellCue(()=>J),map:()=>trailMap(),ask:askToCome};
+ askToCome.hold=1;
+ const say=(lines,done)=>sayWith(J,lines,HFX,done);
  /* the jungle trail map, popped up in front of him */
  function trailMap(){
   const m=el('<img class="trailmap" src="'+A.map+'">');
@@ -462,8 +491,20 @@ function hook(){
   F.appendChild(c);
   c.querySelector('.btn').onclick=e=>{
    e.stopPropagation();c.remove();
-   say(HOOK.go,()=>later(gorge,500));
+   /* "Wonderful! Let's go!" and then the script's Game section, which ends on
+      "[Child will tap Play button]" -- so the hurdle waits for a tap, it does not
+      arrive on a timer. */
+   say(HOOK.go,()=>later(()=>say(HOOK.game,playGate),GAP));
   };
+ }
+ /* The script's second Play button: the line between the story and the game. */
+ function playGate(){
+  foff();
+  const c=el('<div class="over card"><h3>Ready?</h3>'
+   +'<p>Help Jhumru find the word friends<br>and clear the jungle path.</p>'
+   +'<button class="btn">Play</button></div>');
+  F.appendChild(c);
+  c.querySelector('.btn').onclick=e=>{e.stopPropagation();c.remove();gorge()};
  }
 
  function roll(){
@@ -615,18 +656,34 @@ function gorge(){
 
       Then it releases before the game screen, so the handover starts from a neutral
       frame rather than mid-move. */
-   later(()=>camTo(1.15,900,50,62),300);
-   later(()=>{J.face('wow');ask('Oh no! The bridge is broken.','jhu')},700);
-   later(()=>{J.face('think');ask('Two planks are missing. I cannot ride across that.','jhu')},700+LINE);
-   later(()=>camTo(1,700),700+LINE*2-200);
-   later(()=>{
-    /* Hurdle one hands on to hurdle two. Until this the river was only reachable by
-       pressing R, so playing the game normally you never saw it. */
-    if(armed){armed=0;F.appendChild(el('<div class="over card"><h3>The Broken Bridge</h3>'
-     +'<p>The word game goes here.<br>Two planks to mend, two words to find.</p>'
-     +'<button class="btn">On to the river</button></div>'));
-     F.querySelector('.btn').onclick=()=>river();}
-   },700+LINE*2+500);
+   /* A CHAIN, as the hook has been since e28b492. Each beat hands on when its own
+      speech has finished, so nothing is cut off and the camera never moves over the
+      top of a line. The old version fired these on 700 + LINE * n and truncated
+      both of them.
+
+      Order follows the script: he arrives and rings the bell, THEN the camera goes
+      in on the gap and he sees it, then the narrator's transition line. The bell
+      releases its own push when its line ends, so the two camera moves cannot
+      overlap however long the lines run. Written as named beats rather than nested
+      callbacks, because the nesting was four deep and unreadable. */
+   const GFX={bell:bellCue(()=>J)};
+   const beat=(lines,next,wait)=>later(()=>sayWith(J,lines,GFX,next),wait||0);
+
+   const seeIt =()=>{camTo(1.15,900,50,62);beat(BRIDGE.see,turn,500)};
+   const turn  =()=>beat(BRIDGE.turn,handOn);
+   const handOn=()=>{
+    camTo(1,700);
+    /* Hurdle one hands on to hurdle two. Until this the river was only reachable
+       by pressing R, so playing the game normally you never saw it. */
+    later(()=>{
+     if(!armed)return;armed=0;
+     F.appendChild(el('<div class="over card"><h3>The Broken Bridge</h3>'
+      +'<p>The word game goes here.<br>Two planks to mend, two words to find.</p>'
+      +'<button class="btn">On to the river</button></div>'));
+     F.querySelector('.btn').onclick=()=>river();
+    },700);
+   };
+   beat(BRIDGE.in,seeIt,400);
   });
  });
  fon('pointerdown',()=>{});
@@ -690,7 +747,8 @@ function river(){
  },()=>{
   J.air(0,0);
   J.show('still');J.riding(0);tone(430,.12);
-  later(()=>{J.face('wow');ask('A river! It is far too wide to ride across.','jhu')},300);
+  /* Chained, like the hook and the bridge. These three were the last lines in the
+     game still on a precomputed schedule, so they talked over each other. */
   /* Look downstream. He holds his WORLD position while the camera drifts on, so he
      slides left across the frame and open water comes in from the right.
 
@@ -700,22 +758,21 @@ function river(){
      with mirrored foliage helped, because both just moved the cut somewhere else.
      mid_canopy is dropped for this scene too, so there is no treeline on the horizon
      to contradict "no land". */
-  later(()=>{
-   J.face('think');
-   tween(LEG*0.9,q=>{
-    const f=RAFT.look*easeOut(q);
-    rig.setF(f);
-    J.place(RAFT.stop-f*200,yAt(RAFT.shore,RAFT.stop/100));
-   });
-  },300+LINE*0.8);
-  later(()=>ask('There is no land on the other side. Only water.','jhu'),300+LINE*1.6);
-  later(()=>{J.face('proud');ask('But three logs... two of them belong together.','jhu')},300+LINE*2.6);
-  later(()=>{
+  const pan=()=>tween(LEG*0.9,q=>{
+   const f=RAFT.look*easeOut(q);
+   rig.setF(f);
+   J.place(RAFT.stop-f*200,yAt(RAFT.shore,RAFT.stop/100));
+  });
+  const card=()=>later(()=>{
    F.appendChild(el('<div class="over card ask"><h3>The River</h3>'
     +'<p>The word game goes here.<br>Two logs that mean the same make one raft.</p>'
     +'<button class="btn">Back to the start</button></div>'));
    F.querySelector('.btn').onclick=()=>title();
-  },300+LINE*3.8);
+  },600);
+  later(()=>sayWith(J,RIVER.see,null,()=>{
+   pan();                                    /* the pan runs UNDER the next line */
+   sayWith(J,RIVER.look,null,()=>sayWith(J,RIVER.logs,null,card));
+  }),300);
  });
 }
 /* Press R to jump straight to the river while it is being built. */

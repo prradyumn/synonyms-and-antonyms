@@ -189,7 +189,46 @@ const HOOK={
  /* stop 3 -- he turns to the children and waits to be answered */
  clearing:[{who:'jhu',line:'Will you come on this adventure with me?',fx:'ask',face:'ask'}],
  /* and once they say Yes */
- go:[{who:'nar',line:"Wonderful! Let's go!",face:'cheer'}]
+ go:[{who:'nar',line:"Wonderful! Let's go!",face:'cheer'}],
+ /* The script's "Game" section, which was missing entirely: the narrator sets the
+    job up, Jhumru asks for help, and then "[Child will tap Play button]" -- so a
+    Play gate follows these three lines and the first hurdle begins on the tap. */
+ game:[{who:'nar',line:'But Jhumru cannot solve all the challenges alone.',face:'neutral'},
+       {who:'jhu',line:'Will you help me find the word friends and clear the path?',face:'ask'},
+       {who:'jhu',line:"It looks like this adventure is going to be trickier than I thought!",face:'think'}]
+};
+
+/* ---------------------------------------------------------------------------
+   HURDLE ONE -- the broken bridge.  Verbatim from the script.
+
+   These lines used to be string literals inside gorge(), fired on a precomputed
+   `700 + LINE * n` timeline. That is the reason dialogue was still being cut off
+   after the hook was fixed: each ask() calls speechSynthesis.cancel() first, so a
+   line arriving on a guessed schedule silently truncates the one before it. As
+   data here they run through the same one-at-a-time chain the hook uses.
+
+   What went, and why: "Two planks are missing. I cannot ride across that." was
+   never in the script -- it was written before the script arrived, and it says
+   twice over what "I can't cross like this!" already says once.
+   ------------------------------------------------------------------------- */
+const BRIDGE={
+ /* he arrives and rings the bell -- "Tring, tring!" then "SFX!" in the script */
+ in:[{who:'jhu',line:'Tring, tring!',fx:'bell',face:'proud'}],
+ /* the discovery, once the camera has gone in on the gap */
+ see:[{who:'jhu',line:"Oh no! The bridge is broken. I can't cross like this!",face:'wow'}],
+ /* the script's "Transition" line, which sets the synonym up for the word game */
+ turn:[{who:'nar',line:'Jhumru discovered a set of words. To continue his journey, '
+        +'he would need to find another word with the same meaning.',face:'think'}]
+};
+
+/* HURDLE TWO -- the river. Not in the supplied script, which stops at the broken
+   bridge, so the wording here is our own and stands until a script arrives. Chained
+   the same way regardless: these were the last three lines in the game still firing
+   on a precomputed `LINE * n` schedule and cutting each other off. */
+const RIVER={
+ see:[{who:'jhu',line:'A river! It is far too wide to ride across.',face:'wow'}],
+ look:[{who:'jhu',line:'There is no land on the other side. Only water.',face:'think'}],
+ logs:[{who:'jhu',line:'But three logs... two of them belong together.',face:'proud'}]
 };
 
 /* ---------------------------------------------------------------------------
