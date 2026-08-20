@@ -124,6 +124,27 @@ Overlap per join        260 design units
 Plate world positions   plate 1 at 0,  plate 2 at 1920-260,  plate 3 at 2*(1920-260)
 ```
 
+> **This rule was not enough, and here is what the delivery proved.** The bands came
+> back pixel-identical -- 0.00 mean difference -- and the seam really was invisible. But
+> each plate then started its OWN scene the moment its copied band ended: a different
+> ground height (a 41px and a 52px ledge at exactly x=259), greenery that stopped in one
+> plate and restarted as a wall in the next, and content 260 columns in that bore no
+> relation to what came before. An invisible seam between two unrelated pictures is
+> still two unrelated pictures.
+>
+> Measured, comparing what sits just before each candidate join with what follows it:
+> near->far scored 3.78, near->deep 26.13, deep->far 26.55 -- against a natural
+> within-plate variation of 7.98. Two of the three joins were seven times worse than a
+> plate is with itself. In the end only ONE plate could be used, which costs the scene
+> its camera travel.
+>
+> **So there is a third instruction, and it matters more than the other two:** each
+> plate must CONTINUE the previous one -- same ground height where they meet, greenery
+> unbroken across the boundary, the same scenery vocabulary either side. The overlap
+> band guarantees the seam; only continuity guarantees the picture. Ask for the plates
+> as one long drawing cut into pieces, never as three drawings that happen to share a
+> strip.
+
 Two instructions, and they are the difference between a seam and no seam:
 
 1. **The overlap band is the same drawing on both plates.** Plate 2's leftmost 260

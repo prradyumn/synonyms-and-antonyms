@@ -1076,8 +1076,18 @@ def build_font():
 # The muddy path -- hurdle three
 # ---------------------------------------------------------------------------
 MUD_SRC    = 'muddy_path_assets/muddy_path_assets'
+# TWO plates, not three. act_mud_deep is dropped, and this is measured rather than a
+# preference: comparing what sits just before each candidate join with what follows it,
+# near -> far scores 3.78 while near -> deep scores 26.13 and deep -> far 26.55. For
+# scale, the natural variation WITHIN a single plate 260 columns along is 7.98 (near)
+# and 12.26 (far). So near -> far is smoother than either plate is with itself, and the
+# other two joins are seven times worse.
+#
+# The overlap band being pixel-identical makes a seam invisible, which it did -- but it
+# cannot make plate 2's content flow out of plate 1's, and plate 2 diverged the moment
+# its copied band ended. That was the visible defect, and no amount of blending fixed
+# it. Plate 1 carries the mud, which is where he stops, so nothing is lost.
 MUD_PLATES = [('act_mud_near.png', 'act_mud_near.webp'),
-              ('act_mud_deep.png', 'act_mud_deep.webp'),
               ('act_mud_far.png',  'act_mud_far.webp')]
 MUD_LAP    = 260      # design units of overlap per join, per docs/18
 MUD_TARGET = 72.0     # where plate 1's surface must land: act_raft_far's path height
@@ -1146,10 +1156,15 @@ def _mud_greenery(plates, lap):
             out.append((s, len(cols) - 1))
         return out
 
-    # the donor: a stretch of plate 2 that has real bushes on it
-    src = plates[1]
-    stop = tops[1]
-    donor = [x for x in range(300, 690) if stop[x] >= 0]
+    # The donor: whichever plate has the most greenery, sampled from a stretch of it
+    # that really has bushes. It was plate 2 until plate 2 was dropped.
+    green = [((a[..., 3] > 128) & (a[..., 1] > a[..., 0] + 15)).sum() for a in plates]
+    di = int(np.argmax(green))
+    src = plates[di]
+    stop = tops[di]
+    cols = ((src[..., 3] > 128) & (src[..., 1] > src[..., 0] + 15)).any(0)
+    donor = [x for x in range(len(cols)) if cols[x] and stop[x] >= 0]
+    donor = donor[len(donor) // 6: len(donor) // 6 + 420] or donor
 
     def paint(dst, di, x0, x1):
         """Copy greenery into dst columns x0..x1, aligned to each column's surface."""
@@ -1170,15 +1185,15 @@ def _mud_greenery(plates, lap):
 
     for i, a in enumerate(plates):
         for x0, x1 in bald(a):
-            if i == 1 and x0 == 0:
-                continue                        # the copied band; handled below
+            if i > 0 and x0 == 0:
+                continue                        # a copied band; restored below
             paint(a, i, x0, x1)
 
     # restore the overlap identity: whatever plate 1 now has in its right band IS the
     # band, so copy it verbatim into plate 2's left band, and likewise 2 -> 3
     W = plates[0].shape[1]
-    plates[1][:, :lap] = plates[0][:, W - lap:]
-    plates[2][:, :lap] = plates[1][:, W - lap:]
+    for i in range(1, len(plates)):
+        plates[i][:, :lap] = plates[i - 1][:, W - lap:]
     return plates
 
 
@@ -1221,7 +1236,7 @@ def build_mud():
     lap = round(MUD_LAP * W / 1920)
 
     # ---- 1. de-step, plates 2 and 3 -----------------------------------------
-    for i in (1, 2):
+    for i in range(1, len(plates)):
         a = plates[i]
         top, _ = _mud_surface(a)
         step = int(top[lap] - top[lap - 1])      # + means its own ground sits lower
@@ -1258,42 +1273,36 @@ def build_mud():
           % (100 * ref / H, MUD_TARGET, shift, MUD_FLOOR))
 
     for i, a in enumerate(plates):
-        _, bot = _mud_surface(a)
+        top, bot = _mud_surface(a)
         out = np.zeros_like(a)
         out[shift:, :] = a[:H - shift, :]
-        # Flat colour per column, SMOOTHED along x. Three approaches were tried and
-        # this is the one that survives looking at it:
-        #   per-column average alone striped the body like a barcode, because
-        #     neighbouring columns each picked their own mean;
-        #   tiling the band's own bottom rows downward removed every boundary but
-        #     repeated the MUD ellipse as dark stripes all the way down, since the mud
-        #     is part of what those rows contain;
-        #   a smoothed average leaves only a faint tonal ledge where two plates start
-        #     their fill at different heights, below the path and largely under
-        #     near_grass, which is the mildest of the three.
-        col = np.zeros((W, 4))
-        have = np.zeros(W, bool)
+        # STRETCH the delivered band to fill the full depth, rather than filling
+        # below it. Three fills were tried first and all three looked wrong: a
+        # per-column average striped the body like a barcode; tiling the band's own
+        # rows downward repeated the mud ellipse as dark stripes; a smoothed average
+        # left 16% of the frame height as dead flat ochre with a hard top edge, which
+        # was the single ugliest thing on screen.
+        #
+        # Stretching has none of those problems and is also the more correct answer:
+        # ground seen nearly edge-on IS foreshortened, so scaling the band vertically
+        # is what makes it read as receding rather than as a wall. Every pebble, tonal
+        # shift and patch of mud in the delivered art survives, and there is no
+        # boundary anywhere because nothing is synthesised.
         for x in range(W):
-            if bot[x] < 0:
+            if bot[x] < 0 or top[x] < 0:
                 continue
-            band = out[max(0, bot[x] + shift - 5):bot[x] + shift + 1, x]
-            band = band[band[:, 3] > 128]
-            if len(band):
-                col[x] = band.mean(0); have[x] = True
-        if have.any():
-            idx = np.where(have)[0]
-            for k in range(4):
-                col[:, k] = np.interp(np.arange(W), idx, col[idx, k])
-            K = 41
-            pad = np.pad(col, ((K // 2, K // 2), (0, 0)), mode='edge')
-            col = np.stack([np.convolve(pad[:, k], np.ones(K) / K, 'valid')
-                            for k in range(4)], 1)
-            for x in range(W):
-                if not have[x]:
-                    continue
-                y0 = bot[x] + shift + 1
-                if y0 < floor:
-                    out[y0:floor, x] = col[x].round().astype(int)
+            y0, y1 = top[x] + shift, bot[x] + shift          # the band, once shifted
+            if y1 <= y0 or y0 >= floor:
+                continue
+            band = out[y0:y1 + 1, x].astype(float)   # NOT `src` -- that is the pack dir
+            h = floor - y0
+            if h < 2:
+                continue
+            # nearest-neighbour along the column: the band is a soft texture, and
+            # interpolating would smear the pebbles into vertical streaks
+            idx = (np.arange(h) * (len(band) - 1) / (h - 1)).round().astype(int)
+            out[y0:floor, x] = band[idx].round().astype(int)
+
         # ---- 4. edge trunks back up to the top of the frame ------------------
         had_top = a[0, :, 3] > 128               # only columns that carried a trunk
         for x in np.where(had_top)[0]:
@@ -1315,7 +1324,7 @@ def build_mud():
         print('mud   %-20s (%d, %d) %.0fKB'
               % (dst, a.shape[1], a.shape[0], p.stat().st_size / 1024))
 
-    world = 3 * W - 2 * lap
+    world = len(plates) * W - (len(plates) - 1) * lap
     line = np.full(world, np.nan)
     for i, a in enumerate(plates):
         top, _ = _mud_surface(a)
@@ -1328,7 +1337,8 @@ def build_mud():
     # define the ground -- it reported 86.8% once, which is the trunk, not the path
     flat = [round(float(np.nanmedian(line[max(0, k - 60):k + 61])), 2)
             for k in range(0, world, stepn)]
-    print('       RUNTIME  laps [%d,%d]   world %.2f frames' % (MUD_LAP, MUD_LAP, world / W))
+    print('       RUNTIME  laps %s   world %.2f frames'
+          % (str([MUD_LAP] * (len(plates) - 1)), world / W))
     print('       MUD.prof (%d samples, %.1f%%-%.1f%%):' % (len(flat), min(flat), max(flat)))
     print('         ' + str(flat))
 

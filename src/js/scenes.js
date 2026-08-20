@@ -881,18 +881,30 @@ function mud(){
 
  /* Stop short of the mud's near edge, which is measured off plate 2's alpha rather
     than guessed. MUD.stop is a camera fraction. */
- const stopF=Math.min(1,MUD.stop);
+ /* One plate means no camera travel, so the whole arrival is him crossing the frame:
+    a long ride from off-screen left to MUD.hold, which is just short of the mud's near
+    edge. Slower than the usual entry, because it is carrying the motion the camera
+    would otherwise provide. */
+ const HOLD=MUD.hold===undefined?HOLD_X:MUD.hold;
+ const stopF=Math.min(1,MUD.stop||0);
 
  J.place(-12,yOf(0));
  let armed=1;
- const RIDE=RIDE_IN*1.1,RUN=LEG*1.9;
+ const RIDE=RIDE_IN*2.4,RUN=LEG*1.9;
 
- tween(RIDE,p=>J.place(-12+(HOLD_X+12)*easeRide(p),yOf(0)),()=>{
+ tween(RIDE,p=>{
+  const x=-12+(HOLD+12)*easeRide(p);
+  J.place(x,yOf(0));
+ },()=>{
+  if(stopF<=0){arrive();return}
   J.riding(1);J.show('cyc');
   tween(RUN,p=>{
    const f=stopF*easeOut(p);
-   rig.setF(f);J.place(HOLD_X,yOf(f));
-  },()=>{
+   rig.setF(f);J.place(HOLD,yOf(f));
+  },arrive);
+ });
+
+ function arrive(){
    J.show('still');J.riding(0);tone(430,.12);
    /* In on the mud, as the gorge does on the gap: this is the obstacle and it has to
       become the subject before any words arrive. Released before the card, so the
@@ -910,8 +922,7 @@ function mud(){
    },700);
    later(()=>camTo(1.15,900,54,70),300);
    beat(MUDTALK.see,tryIt,700);
-  });
- });
+ }
  fon('pointerdown',()=>{});
 }
 

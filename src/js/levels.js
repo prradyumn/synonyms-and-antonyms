@@ -16,8 +16,8 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
          r_far:'assets/bg/act_raft_far.webp',water_far:'assets/bg/water_far.webp',
          water_near:'assets/bg/water_near.webp',near_reeds:'assets/bg/near_reeds.webp',
          bubble:'assets/chars/bubble.webp',
-         m_near:'assets/bg/act_mud_near.webp',m_deep:'assets/bg/act_mud_deep.webp',
-         m_far:'assets/bg/act_mud_far.webp',mud_near:'assets/bg/mud_near.webp',
+         m_near:'assets/bg/act_mud_near.webp',m_far:'assets/bg/act_mud_far.webp',
+         mud_near:'assets/bg/mud_near.webp',
          stone_a:'assets/chars/prop_stone_1.webp',stone_b:'assets/chars/prop_stone_2.webp',
          stone_c:'assets/chars/prop_stone_3.webp',stones_ok:'assets/chars/stones_firm.webp',
          stones_bad:'assets/chars/stones_sunk.webp',splat:'assets/chars/fx_mud_splat.webp',
@@ -160,28 +160,61 @@ const RAFT={
    88%, behind near_grass. Every number below is printed by that build step.
    ------------------------------------------------------------------------- */
 const MUD={
- seg:['m_near','m_deep','m_far'],
- /* 260 per join, and the overlap band is the SAME art on both plates -- so the join
+ /* TWO plates, not three. act_mud_deep is dropped, and that is measured rather than a
+    preference: comparing what sits just BEFORE each candidate join with what follows
+    it, near->far scores 3.78, near->deep 26.13 and deep->far 26.55. For scale, the
+    natural variation WITHIN one plate 260 columns along is 7.98 (near) and 12.26
+    (far). So near->far is smoother than either plate is with itself, and the other two
+    joins are seven times worse.
+
+    Pixel-identical overlap bands do make a seam invisible, and they did -- but they
+    cannot make one plate's content flow out of the other's, and plate 2 diverged the
+    moment its copied band ended. That was the visible defect and no amount of
+    blending fixed it. Plate 1 carries the mud, which is where he stops, so the
+    obstacle is not lost. */
+ /* ONE plate. Not a shortcut -- it is the only seamless option available with what
+    was delivered, and the reasoning is worth keeping.
+
+    Three plates gave two joins. Comparing what sits just BEFORE each candidate join
+    with what follows it: near->far scores 3.78, near->deep 26.13, deep->far 26.55,
+    against a natural within-plate variation of 7.98. So act_mud_deep was dropped and
+    near->far kept. That join still showed, because pixel-identical overlap bands make
+    a SEAM invisible but cannot make one plate's content flow out of the other's -- and
+    with two 1920-wide plates the join is on screen from the first frame, since at f=0
+    the frame already spans world 0-1920 and the join sits at 1660. No amount of
+    lapping moves it out of shot.
+
+    Plate 1 on its own is coherent: greenery across, one continuous path, the mud patch,
+    a trunk at the world edge. It carries the obstacle, which is where he stops.
+
+    The cost is real and worth stating: with one segment there is no camera travel, so
+    the parallax layers hold still and the motion in this scene is him riding in. The
+    fix that buys back both is a regeneration of plate 2 that CONTINUES plate 1 --
+    same ground height, greenery unbroken, ground body to the frame bottom -- rather
+    than starting its own scene 260 columns in. */
+ seg:['m_near'],
+ /* 260 for the one join, and the overlap band is the SAME art on both plates -- so it
     cancels rather than being covered. `nojoin` because a join trunk over a match is
     the mistake that laid a translucent tree across the river. */
- laps:[260,260],
+ laps:[],
  nojoin:1,
  /* Measured off the built plates by walking UP from the lowest warm pixel. Measuring
     down from the top finds trunk bark and greenery, which is how the rider came to
     float 83px on the bridge approach. A local median per sample, so a rock edge cannot
-    define the ground. */
+    define the ground. Do not hand-edit; re-run build_mud(). */
  prof:[
-  [75.56,73.80,72.78,72.50,72.41,72.41,72.22,71.94,71.85,72.04,71.94,72.04,71.94,72.04,72.04,72.04,72.04],
-  [72.04,72.04,72.04,70.28,68.80,68.15,68.06,68.06,68.15,68.06,68.06,67.96,68.06,68.15,68.43,68.15,68.15],
-  [68.61,68.15,68.15,70.28,71.94,72.78,72.78,72.50,71.48,70.28,68.89,67.59,66.20,65.37,66.94,68.24,68.43]
+  [75.56,73.98,73.06,73.24,72.50,72.50,72.41,72.04,71.85,71.94,71.94,71.94,72.04,71.94,72.04,72.04,72.04]
  ],
  /* How far the tyres bed in, as a percentage of HIS height. 5% is right for planks;
     mud is soft, and 11% is what puts the contact 3.5% of the frame below the surface. */
  drop:11,
- /* The mud itself, as fractions of the whole world -- measured off plate 2's alpha,
-    not taken from the brief. He stops just short of its near edge. */
- mud:[0.3664,0.6532],
- stop:0.30,
+ /* The mud, as fractions of the whole world -- measured off plate 1's alpha, which is
+    where it lives now that plate 2 is gone. He stops just short of its near edge. */
+ mud:[0.20,0.68],
+ stop:0,            /* one plate, so there is nowhere to travel to */
+ /* Where he pulls up, as a percentage of the frame -- just short of the mud's near
+    edge rather than at the usual HOLD_X, since the camera cannot bring the mud to him. */
+ hold:34,
  /* The near lip of the mud, passing IN FRONT of his wheels at 1.18. That occlusion is
     the whole scene: a wheel on a painting of mud is a sticker, a wheel with the mud's
     edge crossing it is in the mud. water_near was meant to do this for the raft and
