@@ -15,6 +15,7 @@ const A={map:'assets/bg/map.webp',ramp:'assets/bg/ramp.webp',
          r_bank:'assets/bg/act_raft_bank.webp',r_open:'assets/bg/act_raft_open.webp',
          r_far:'assets/bg/act_raft_far.webp',water_far:'assets/bg/water_far.webp',
          water_near:'assets/bg/water_near.webp',near_reeds:'assets/bg/near_reeds.webp',
+         bubble:'assets/chars/bubble.webp',
          raft:'assets/chars/raft_fused.webp',raft_bad:'assets/chars/raft_stepped.webp',
          log_a:'assets/chars/prop_log_smooth.webp',log_b:'assets/chars/prop_log_ridged.webp',
          log_c:'assets/chars/prop_log_moss.webp',splash:'assets/chars/fx_splash.webp'};
@@ -148,13 +149,21 @@ const RAFT={
    so swapping modes never shifts him -- see place() in scenes.js.
    hu/ar/ax for the wheelie modes are printed by build_wheelie(); re-run it and
    paste them again if the frames are ever regenerated. */
+/* mx/my are where his MOUTH is, as fractions of the sprite box -- the point the
+   speech bubble's tail aims at. Measured off the art by finding the red of the open
+   mouth, not eyeballed. On the stopped pose the six expressions put the mouth
+   anywhere from 0.307 to 0.439 across, so 0.36 is the middle of that spread; the tail
+   points TOWARD the mouth rather than touching it, so 30-odd units of drift between
+   expressions does not read. */
 const RIDER={
- cyc  :{url:'assets/chars/jhumru_cycle.webp',      hu:322, ar:331/440, ax:0.290},
+ cyc  :{url:'assets/chars/jhumru_cycle.webp',      hu:322, ar:331/440, ax:0.290,
+        mx:0.395, my:0.226},
  /* The stopped pose is a HEADLESS body plus a face layer, so only the head ever
     changes and a cross-fade cannot morph the bicycle. hu/ar/ax are printed by
     build_stills(); hu 348 is derived from the wheel-to-tuft distance so he stays
     exactly the size he was on the cycling loop when the sprite swaps. */
- still:{url:'assets/chars/jhumru_still_body.webp',hu:348, ar:0.6716, ax:0.2522, face:1},
+ still:{url:'assets/chars/jhumru_still_body.webp',hu:348, ar:0.6716, ax:0.2522, face:1,
+        mx:0.360, my:0.254},
  lift :{url:'assets/chars/wheelie_lift.webp',      hu:314, ar:1.0886,  ax:0.409},
  hold :{url:'assets/chars/wheelie_hold.webp',      hu:314, ar:1.0886,  ax:0.409},
  land :{url:'assets/chars/wheelie_land.webp',      hu:314, ar:1.0886,  ax:0.409}

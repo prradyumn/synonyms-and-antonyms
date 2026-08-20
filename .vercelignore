@@ -12,3 +12,9 @@ tools/
 docs/
 prototypes/
 .vscode/
+
+# Build INPUTS for the expression stills. build_stills() turns these into
+# jhumru_still_body.webp plus the six face_*.webp overlays, and only those are
+# fetched at runtime -- these six full characters and the zip they arrived in were
+# shipping as 2.5MB of dead weight, a third of the whole bundle.
+assets/chars/jhumru_expression_stills_webp*

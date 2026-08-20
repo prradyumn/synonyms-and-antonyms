@@ -248,6 +248,51 @@ function mkActor(modes,defKey,rider){
   w.style.transform='translate('+(anchorX - m.ax*o.CW)+'px,'
    +(o.y/100*F.clientHeight - o.CH)+'px) scaleX('+o.f+')';
  };
+ /* ---- his own speech bubble ----
+    Geometry measured off bubble.webp (572x235): the tail tip is at (0.985, 0.923)
+    of the canvas, so the bubble hangs up and to the LEFT of whatever the tail points
+    at. TAIL_DX/DY back the tip off his mouth so it aims at him rather than covering
+    his face. All four numbers are in design units and the editor reports the same
+    units, so a nudge there pastes straight back in here. */
+ const BUB_W=520, BUB_AR=572/235, TAIL_X=0.985, TAIL_Y=0.923;
+ const TAIL_DX=18, TAIL_DY=30;
+ const bub=el('<div class="bub" hidden><div class="bubtxt"></div></div>');
+ F.appendChild(bub);                     /* OUTSIDE #stage, so a push cannot scale it */
+ const btx=bub.firstElementChild;
+ let bubOn=0;
+ /* 32 design units is the specified size and every line in the script fits in the
+    three lines the box holds -- measured, all thirteen of them. But this is a WORD
+    game: the content is meant to change, and a line one word longer would be
+    silently clipped. So the size steps down only if it has to, which keeps 32 the
+    normal case and makes a clipped line impossible rather than unlikely. */
+ const BUB_SIZES=[32,29,26,23];
+ o.bubble=t=>{
+  btx.textContent=t;bub.hidden=false;
+  for(const px of BUB_SIZES){
+   btx.style.fontSize='calc('+px+' * var(--u))';
+   if(btx.scrollHeight<=btx.clientHeight+1)break;
+  }
+  if(bubOn)return;
+  /* Follows him every frame while it is up. It has to be every frame and not just on
+     place(): a camera push moves him on screen without place() ever being called, and
+     at() reads getBoundingClientRect, so it already accounts for the stage scale.
+     Idle while the game is paused, which is how the dev layout editor can hold the
+     frame and drag the bubble to read numbers off it. */
+  bubOn=1;const g=GEN;
+  (function fr(){
+   if(!bubOn||g!==GEN)return;
+   if(!PAUSED)o.bubAt();
+   requestAnimationFrame(fr);
+  })();
+ };
+ o.hush=()=>{bubOn=0;bub.hidden=true};
+ o.bubAt=()=>{
+  const m=o.m||o.base;
+  const [mx,my]=o.at(m.mx===undefined?0.36:m.mx,m.my===undefined?0.25:m.my);
+  const w=100*BUB_W/1920, h=100*(BUB_W/BUB_AR)/1080;
+  bub.style.left=(mx-100*TAIL_DX/1920-TAIL_X*w).toFixed(2)+'%';
+  bub.style.top =(my-100*TAIL_DY/1080-TAIL_Y*h).toFixed(2)+'%';
+ };
  o.show(defKey);
  return o;
 }
@@ -415,10 +460,22 @@ const GAP=520;
 function sayWith(actor,lines,fx,done){
  let i=0;
  (function step(){
-  if(i>=lines.length){if(done)done();return}
+  /* The bubble is a SPEECH ACT: it goes when he stops speaking. Leaving it up cost
+     nothing when his words were in the narrator's box, but a bubble pinned to him for
+     the fifteen seconds of a ride covers the scene he is riding through. A HOLDING
+     cue never reaches here -- the Yes button keeps his question on screen, which it
+     must, since the child is being asked to answer it. */
+  if(i>=lines.length){
+   if(actor&&actor.hush)actor.hush();
+   if(done)done();return}
   const l=lines[i++];
   if(actor&&l.face)actor.face(l.face);
   const cue=(l.fx&&fx)?fx[l.fx]:null;
+  /* His words go in HIS bubble; the narrator keeps the box at the top. ask() hushes
+     the box for a 'jhu' line, so the two are never both up. */
+  if(actor&&actor.bubble){
+   if(l.who==='jhu'){actor.bubble(l.line);actor.bubAt()}else actor.hush();
+  }
   ask(l.line,l.who,(cue&&cue.hold)?cue:()=>{
    if(cue&&cue.after)cue.after();
    later(step,GAP);

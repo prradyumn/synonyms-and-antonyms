@@ -129,16 +129,30 @@ let said='';
    or has no voice installed, and without it the whole chain would simply stop. A
    token guards against speechSynthesis.cancel() firing `end` on the line we just
    replaced and advancing the chain twice. */
+/* A dev log of every line spoken: when it started, when it finished, what ended it,
+   and whether it was still going when the next one began. Kept because "let each
+   dialogue complete before the game moves" is the property that keeps regressing, and
+   it cannot honestly be measured from outside -- watching the DOM from a test harness
+   reads a screenshot pause as the line still being up, and reads a frozen game clock
+   as the line being cut. The code that owns the fact records it. Wall clock, because
+   speech runs on wall clock. Bounded so a long session cannot grow it forever. */
+window.__said=[];
 let SPTOK=0;
 function speak(t,who,done){
  said=t;
  const tok=++SPTOK;
  const words=(String(t).match(/\S+/g)||[]).length;
  let fired=false;
- const finish=()=>{if(fired||tok!==SPTOK)return;fired=true;if(done)done()};
- const guard=later(finish,Math.max(1500,words*430)+500);
+ const rec={t:t,who:who,words:words,t0:performance.now(),t1:null,by:null};
+ if(window.__said.length>200)window.__said.shift();
+ const prev=window.__said[window.__said.length-1];
+ if(prev&&prev.t1===null)prev.cutBy=t;      /* the previous line never finished */
+ window.__said.push(rec);
+ const finish=()=>{if(fired||tok!==SPTOK)return;fired=true;
+  rec.t1=performance.now();if(done)done()};
+ const guard=later(()=>{rec.by='fallback';finish()},Math.max(1500,words*430)+500);
  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);
- u.onend=()=>{cancel(guard);finish()};
+ u.onend=()=>{rec.by='speech';cancel(guard);finish()};
  /* the narrator sits lower and slower than Jhumru, so a child can tell who is
     talking without being told */
  u.rate=who==='nar'?.66:.72;u.pitch=who==='nar'?.82:1.12;const v=speechSynthesis.getVoices().find(v=>/en-IN|India/i.test(v.lang+v.name))||speechSynthesis.getVoices().find(v=>/^en/i.test(v.lang));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
@@ -152,10 +166,24 @@ $('#mute').onclick=()=>{
  muted=!muted;Object.values(SND).forEach(a=>{a.muted=muted});
  if(muted){hushAll();audioLive(false)}else play('bgm');
 };
-function ask(t,who,done){$('#asktxt').textContent=t;speak(t,who,done)}
+/* The narrator's box. Jhumru's own words go in his speech bubble instead -- sayWith
+   puts them there -- so the box is hushed for his lines rather than showing them
+   twice. Its text is left alone while hushed, so the narrator's last line is still
+   there when it fades back in and nothing reflows. */
+function ask(t,who,done){
+ const box=$('#ask');
+ if(who==='jhu')box.classList.add('hushed');
+ else{box.classList.remove('hushed');$('#asktxt').textContent=t}
+ speak(t,who,done);
+}
 function el(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function svg(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
-function clean(){GEN++;kill();RELAY=null;foff();camReset();stopSnd('bike');fade('river',0,700);FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
+/* The narrator's box starts every scene EMPTY and hidden. Unhushing it on a scene
+   change revealed whatever it still held -- so the broken bridge opened with "But
+   Jhumru cannot solve all the challenges alone" from the previous scene, sitting there
+   through sixteen seconds of riding. It comes back the moment the narrator speaks. */
+function clean(){GEN++;kill();RELAY=null;foff();camReset();
+ $('#ask').classList.add('hushed');$('#asktxt').textContent='';stopSnd('bike');fade('river',0,700);FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.bub,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
 function setbg(k){BG.style.backgroundImage='url('+A[k]+')'}
 
 /* ---- camera scale ----

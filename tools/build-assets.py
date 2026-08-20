@@ -5,7 +5,7 @@
     python3 tools/build-assets.py
 """
 from PIL import Image
-import numpy as np, pathlib, sys, math
+import numpy as np, pathlib, sys, math, os, subprocess
 from scipy import ndimage
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -978,6 +978,8 @@ def main():
     build_audio()
     build_wheelie()
     build_ramp()
+    build_bubble()
+    build_font()
     for key, (fn, h, dur) in LOOPS.items():
         p = CH / fn
         if not p.exists():
@@ -994,6 +996,80 @@ def main():
             frames[LOOP_STILLS[key]].save(still, 'WEBP', quality=88, method=6)
             print('still', key, size, f'{still.stat().st_size / 1024:.0f}KB')
     build_expressions()      # last: it swaps heads onto jhumru_cycle_still
+
+# ---------------------------------------------------------------------------
+# The speech bubble and the font it holds
+# ---------------------------------------------------------------------------
+BUBBLES = [('bubble_tail_corner.png', 'bubble.webp'),      # in use: corner tail
+           ('bubble_tail_down.png',   'bubble_down.webp')] # the alternative, spare
+FONT_SRC = os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Microsoft', 'Windows',
+                        'Fonts', 'Poppins-SemiBold.ttf')
+
+
+def build_bubble():
+    """Jhumru's parchment speech bubble, and the geometry the runtime needs.
+
+    Two were supplied. bubble.webp is the one in use, because its tail is at the
+    bottom-RIGHT corner: the bubble therefore hangs up and to the LEFT of whatever the
+    tail points at, and he faces and travels right with the path ahead to be kept
+    clear. The other keeps its place here so switching is one CSS url away.
+
+    The printed numbers are what CSS and mkActor are set from -- do not eyeball them."""
+    src = ROOT / 'assets' / 'source'
+    for a, b in BUBBLES:
+        p = src / a
+        if not p.exists():
+            print(f'skip bubble {a} (not in assets/source)'); continue
+        im = Image.open(p).convert('RGBA')
+        dst = CH / b
+        im.save(dst, 'WEBP', quality=90, method=6)
+        arr = np.array(im).astype(int)
+        al = arr[..., 3]; H, W = al.shape
+        op = al > 128
+        ys, xs = np.where(op)
+        bot = ys.max(); botx = xs[ys > bot - 3]
+        # the largest box that is PALE fill on every row -- the conservative text area.
+        # The one CSS uses is wider than this, because the tail only eats the
+        # bottom-right corner and centred text never reaches a corner.
+        lum = arr[..., :3].mean(2)
+        pale = op & (lum > 195)
+        best = (0, None)
+        for y0 in range(0, H, 4):
+            for y1 in range(y0 + 40, H, 4):
+                cols = pale[y0:y1].all(0)
+                if not cols.any(): continue
+                idx = np.where(cols)[0]
+                run = max(np.split(idx, np.where(np.diff(idx) != 1)[0] + 1), key=len)
+                area = (y1 - y0) * len(run)
+                if area > best[0]: best = (area, (run[0], y0, run[-1], y1))
+        x0, y0, x1, y1 = best[1]
+        print(f'bubble {b:20s} {im.size}  {dst.stat().st_size / 1024:.1f}KB')
+        print(f'       aspect {W / H:.3f}   tail tip ({botx.mean() / W:.3f}, {bot / H:.3f})')
+        print(f'       text safe (conservative) left {x0 / W:.3f} top {y0 / H:.3f} '
+              f'width {(x1 - x0) / W:.3f} height {(y1 - y0) / H:.3f}')
+
+
+def build_font():
+    """Poppins SemiBold, subset and bundled LOCALLY.
+
+    Not a webfont request: the game has to work with no network at all. Subset to
+    printable ASCII plus the curly quotes and dashes a script picks up from a word
+    processor, which is generous enough that new dialogue never hits a missing glyph.
+    Poppins is OFL, so shipping a copy is fine."""
+    if not os.path.exists(FONT_SRC):
+        print('skip font (Poppins-SemiBold.ttf not installed)'); return
+    out = ROOT / 'assets' / 'fonts' / 'poppins-semibold.woff2'
+    out.parent.mkdir(parents=True, exist_ok=True)
+    chars = ''.join(chr(c) for c in range(0x20, 0x7F)) + '‘’“”–—… '
+    r = subprocess.run([sys.executable, '-m', 'fontTools.subset', FONT_SRC,
+                        '--unicodes=' + ','.join(f'U+{ord(c):04X}' for c in chars),
+                        '--layout-features=kern,liga', '--flavor=woff2',
+                        '--output-file=' + str(out)], capture_output=True, text=True)
+    if r.returncode:
+        print('font subset FAILED:', r.stderr.strip()[:200]); return
+    print(f'font   {out.name:20s} {os.path.getsize(FONT_SRC) / 1024:.0f}KB -> '
+          f'{out.stat().st_size / 1024:.1f}KB  ({len(chars)} glyphs)')
+
 
 if __name__ == '__main__':
     main()

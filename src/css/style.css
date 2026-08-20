@@ -1,3 +1,12 @@
+/* Poppins SemiBold, bundled and subset. A LOCAL file, not a webfont request: the
+   game has to work with no network at all. Subset to printable ASCII plus the curly
+   quotes and dashes a script picks up from a word processor, which takes the 152KB
+   TTF installed on the author's machine down to 4.5KB. Poppins is OFL, so shipping a
+   copy is fine. `font-display:block` because a swap would reflow a speech bubble
+   mid-line. */
+@font-face{font-family:Poppins;font-style:normal;font-weight:600;font-display:block;
+ src:url(../../assets/fonts/poppins-semibold.woff2) format('woff2')}
+
 /* The game is authored in a 1920x1080 design space. Every length inside #frame
    is written in those units and multiplied by --u, which resolves to 1/1920 of
    the frame's actual width -- so the layout is pixel-identical whether the frame
@@ -173,3 +182,38 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 /* The shore-end cap. object-fit:fill because it is a slice of a full-height plate
    and must scale exactly like the plate it sits on. */
 .shorecap{object-fit:fill;pointer-events:none}
+
+/* ---- Jhumru's speech bubble ----
+   His own words go here, not in the narrator's box. The parchment bubble is a
+   supplied asset (Union (19), the bottom-right corner tail) so the tail points
+   down-right at a speaker who is below-right of it -- which is where he is, facing
+   and travelling right with the path ahead to be kept clear.
+
+   It lives OUTSIDE #stage on purpose. A camera push scales #stage, and text scaled
+   1.22x goes soft and can leave the frame; out here the bubble stays crisp at one
+   size and simply follows his mouth on screen, which mkActor does every frame.
+
+   All geometry is measured off the asset, not guessed:
+     canvas    572 x 235   -> aspect 2.434
+     tail tip  (0.985, 0.923) of the canvas
+     text safe left 0.115  top 0.068  width 0.706  height 0.766  (the box that is
+               all-pale on every row, which is the conservative reading)
+   The text box below is wider than that measurement, at 0.80 x 0.68. The measured
+   box has to clear the tail on EVERY row, but the tail only eats the bottom-right
+   corner, and centred text never reaches a corner. Using the wider box is what lets
+   the bubble come down from 620 to 520 design units while the 32-unit text still
+   fits the longest line in the script in three lines -- verified against all
+   thirteen of his lines, not assumed. */
+.bub{position:absolute;z-index:9;pointer-events:none;
+ width:calc(520 * var(--u));height:calc(214 * var(--u));
+ background:url(../../assets/chars/bubble.webp) no-repeat;background-size:100% 100%}
+.bub[hidden]{display:none}
+.bubtxt{position:absolute;left:7.5%;top:10%;width:80%;height:68%;
+ display:flex;align-items:center;justify-content:center;text-align:center;
+ font-family:Poppins,"Segoe UI",Roboto,sans-serif;font-weight:600;
+ font-size:calc(32 * var(--u));line-height:1.3;color:#4A3520;
+ /* long words must break rather than push text under the border */
+ overflow-wrap:break-word;hyphens:auto}
+/* The narrator's box, out of the way while he is speaking for himself. Kept in the
+   layout rather than removed, so nothing reflows when it comes back. */
+#ask.hushed{opacity:0}

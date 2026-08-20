@@ -43,7 +43,9 @@ const CONFIG = {
      builds at runtime is editable the moment it exists. Parallax layers are
      left out on purpose: they are four frames wide and never want dragging. */
   targets: [
-    ['#ask',        'speech bubble'],
+    ['#ask',        'narrator box'],
+    ['.bub',        'jhumru bubble'],
+    ['.bubtxt',     'jhumru bubble text'],
     ['#mute',       'sound button'],
     ['.over.card',  'card panel'],
     ['.btn',        'button'],
