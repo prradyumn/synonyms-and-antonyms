@@ -578,10 +578,12 @@ function gorge(){
    later(()=>{J.face('think');ask('Two planks are missing. I cannot ride across that.','jhu')},700+LINE);
    later(()=>camTo(1,700),700+LINE*2-200);
    later(()=>{
+    /* Hurdle one hands on to hurdle two. Until this the river was only reachable by
+       pressing R, so playing the game normally you never saw it. */
     if(armed){armed=0;F.appendChild(el('<div class="over card"><h3>The Broken Bridge</h3>'
      +'<p>The word game goes here.<br>Two planks to mend, two words to find.</p>'
-     +'<button class="btn">Back to the start</button></div>'));
-     F.querySelector('.btn').onclick=()=>title();}
+     +'<button class="btn">On to the river</button></div>'));
+     F.querySelector('.btn').onclick=()=>river();}
    },700+LINE*2+500);
   });
  });
