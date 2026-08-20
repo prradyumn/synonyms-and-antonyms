@@ -145,14 +145,6 @@ body{margin:0;background:#101E19;display:flex;flex-direction:column;align-items:
 /* % of #frame's own box -- #frame can't resolve the cqw in --u against itself */
 #note{max-width:1920px;margin:13px auto 0;color:#8FA394;font-size:12.5px;line-height:1.6;text-align:center}
 
-/* The dialogue portrait. It overhangs the bar top and bottom, which is why the
-   bar needs no extra height for it. Two stacked images so an expression can
-   cross-fade instead of cutting -- see portrait() in engine.js. */
-#face{position:relative;flex:none;width:calc(132 * var(--u));height:calc(132 * var(--u));
- margin:calc(-31 * var(--u)) 0}
-#face img{position:absolute;inset:0;width:100%;height:100%}
-#face img.out{z-index:2}
-#face[hidden],#face img[hidden]{display:none}
 
 /* Raft-scene props. They live inside the act layer so they travel with the world,
    and object-fit keeps their own aspect whatever box they are given. */

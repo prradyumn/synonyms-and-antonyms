@@ -41,27 +41,6 @@ const FACES={
  ask    :'assets/chars/face_ask.webp',     cheer:'assets/chars/face_cheer.webp'
 };
 
-/* Dialogue portraits -- a face beside the speech text, not a swap on the bike.
-
-   Swapping his head on the bicycle was tried twice and abandoned. The delivered
-   heads are drawn at 80-90% of the original's size and sit up to 28px low, so
-   unregistered they shrink and slide as the expression changes; and registering
-   them to the right size pushes the chin down through row 280, where the art
-   simply stops, leaving a cut with the original's chin under it. There is no
-   composite that satisfies both.
-
-   A portrait needs no body, so the circle is framed to end above row 280 and
-   nothing is joined at all. Every head is registered on the blue hair tuft first,
-   so one crop box frames all eight identically and the face never jumps.
-   build_portraits() in tools/build-assets.py. */
-const PORTRAIT={
- neutral  :'assets/chars/port_neutral.webp',
- proud    :'assets/chars/port_proud.webp',
- think    :'assets/chars/port_think.webp',
- wow      :'assets/chars/port_wow.webp',
- ask      :'assets/chars/port_ask.webp',
- cheer    :'assets/chars/port_cheer.webp'
-};
 
 const GORGE={
  seg:['g_near','g_span','g_far'],
@@ -172,9 +151,9 @@ const RIDER={
    in order and the pause sizes itself to fit, so lines can be added or cut here
    without touching scenes.js.
    ------------------------------------------------------------------------- */
-/* `face` names an entry in PORTRAIT. It holds until another line changes it, so a
-   stop only needs to name an expression when it turns. Narrator lines carry one
-   too -- he is on screen being talked about. */
+/* `face` names an entry in FACES and changes the expression ON HIM. It holds until
+   another line changes it, so a stop only names an expression when it turns.
+   Narrator lines carry one too -- he is on screen being talked about. */
 const HOOK={
  /* stop 1 -- the near bank, he introduces himself and his bicycle */
  bank:[{who:'nar',line:'Jhumru was setting off on an exciting adventure through the jungle on his new bicycle.',face:'neutral'},

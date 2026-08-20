@@ -124,30 +124,10 @@ $('#mute').onclick=()=>{
  muted=!muted;Object.values(SND).forEach(a=>{a.muted=muted});
  if(muted){hushAll();audioLive(false)}else play('bgm');
 };
-function ask(t,who,face){$('#asktxt').textContent=t;speak(t,who);portrait(face)}
-
-/* The dialogue portrait. Cross-faded rather than cut, so a change of expression
-   reads as him changing his mind rather than as a flicker, and driven off VT like
-   everything else so it pauses with the game. A line with no `face` leaves the
-   portrait exactly as it was -- expressions hold across the lines of a stop. */
-let PFACE=null;
-function portrait(k){
- const box=$('#face');if(!box)return;
- if(!k||!PORTRAIT[k])return;
- box.hidden=false;
- if(k===PFACE)return;
- const im=box.querySelectorAll('img'),live=im[0],out=im[1],was=live.getAttribute('src');
- PFACE=k;live.src=PORTRAIT[k];
- if(!was){out.hidden=true;return}
- out.src=was;out.hidden=false;out.style.opacity='1';
- tween(220,p=>{out.style.opacity=String(1-p)},
-       ()=>{out.hidden=true;out.removeAttribute('src')});
-}
-function noFace(){const b=$('#face');if(b){b.hidden=true;PFACE=null;
- b.querySelectorAll('img').forEach(i=>i.removeAttribute('src'))}}
+function ask(t,who){$('#asktxt').textContent=t;speak(t,who)}
 function el(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
 function svg(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild}
-function clean(){GEN++;kill();RELAY=null;foff();noFace();camReset();stopSnd('bike');fade('river',0,700);FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
+function clean(){GEN++;kill();RELAY=null;foff();camReset();stopSnd('bike');fade('river',0,700);FX.innerHTML='';AIR.innerHTML='';[...F.querySelectorAll('.pxb,.pxf,.ch,.cyc,.stone,.sign,.vine,.tag,.node,.over,.verd,.ring')].forEach(n=>n.remove());BG2.style.opacity='0';BG2.style.backgroundImage='';F.classList.remove('shake');try{speechSynthesis.cancel()}catch(e){}}
 function setbg(k){BG.style.backgroundImage='url('+A[k]+')'}
 
 /* ---- camera scale ----

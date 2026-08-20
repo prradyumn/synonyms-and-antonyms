@@ -361,10 +361,10 @@ function hook(){
  fon('pointerdown',skip);
  const done=()=>gorge();
 
- /* Portraits preload with the plates: one arriving late would show the wrong
-    expression for a frame, or none at all. */
+ /* The faces preload with the plates: one arriving late would show a headless body
+    for a frame, since the stopped sprite is a body plus a face layer. */
  Promise.all(['far_sky','mid_canopy','act_bank','act_bridge','act_clearing','cyc','cycs']
-  .map(k=>A[k]).concat(Object.values(PORTRAIT))
+  .map(k=>A[k]).concat(Object.values(FACES))
   .map(u=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=u})))
   .then(()=>{if(g===GEN)roll()});
 
@@ -374,7 +374,7 @@ function hook(){
     or shrink in levels.js without touching any timing here. */
  const say=(lines,t0)=>{
   lines.forEach((l,i)=>later(()=>{
-   ask(l.line,l.who,l.face);if(J&&l.face)J.face(l.face);
+   ask(l.line,l.who);if(J&&l.face)J.face(l.face);
    if(l.fx==='bell')bellBeat();
    if(l.fx==='map')trailMap();
    if(l.fx==='ask')askToCome();
@@ -574,8 +574,8 @@ function gorge(){
       Then it releases before the game screen, so the handover starts from a neutral
       frame rather than mid-move. */
    later(()=>camTo(1.15,900,50,62),300);
-   later(()=>ask('Oh no! The bridge is broken.','jhu','wow'),700);
-   later(()=>ask('Two planks are missing. I cannot ride across that.','jhu','think'),700+LINE);
+   later(()=>{J.face('wow');ask('Oh no! The bridge is broken.','jhu')},700);
+   later(()=>{J.face('think');ask('Two planks are missing. I cannot ride across that.','jhu')},700+LINE);
    later(()=>camTo(1,700),700+LINE*2-200);
    later(()=>{
     if(armed){armed=0;F.appendChild(el('<div class="over card"><h3>The Broken Bridge</h3>'
@@ -643,8 +643,8 @@ function river(){
   J.place(x,yAt(RAFT.shore,Math.max(0,x/100)));
  },()=>{
   J.show('still');J.riding(0);tone(430,.12);
-  later(()=>ask('A river! It is far too wide to ride across.','jhu','wow'),300);
-  later(()=>ask('Three logs. Two of them belong together.','jhu','think'),300+LINE);
+  later(()=>{J.face('wow');ask('A river! It is far too wide to ride across.','jhu')},300);
+  later(()=>{J.face('think');ask('Three logs. Two of them belong together.','jhu')},300+LINE);
   later(()=>{
    F.appendChild(el('<div class="over card"><h3>The River</h3>'
     +'<p>The word game goes here.<br>Two logs that mean the same make one raft.</p>'
