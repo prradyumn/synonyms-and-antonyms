@@ -526,6 +526,10 @@ function closeEditor() {
   select(null);
 }
 
+/* DEV ONLY. Ungated, this built its panel and a 288x162 alignment-map canvas into
+   every shipped page load, and bound E to open it. */
+if (!IS_DEV) return;
+
 build();
 window.addEventListener('keydown', (ev) => {
   if (/INPUT|TEXTAREA/.test((document.activeElement || {}).tagName || '')) return;

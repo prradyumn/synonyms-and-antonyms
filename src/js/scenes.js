@@ -832,9 +832,11 @@ function river(){
   }),300);
  });
 }
-/* Press R to jump straight to the river while it is being built. */
-addEventListener('keydown',e=>{if(e.key==='r'||e.key==='R')river()});
-
-/* Press B from anywhere to jump straight to the hurdle while it is being built. */
-addEventListener('keydown',e=>{if(e.key==='b'||e.key==='B')gorge()});
+/* Jump keys, DEV ONLY -- R for the river, B for the hurdle, while they are being
+   built. Ungated these shipped, so a child leaning on the keyboard mid-story was
+   teleported into another scene. */
+if(IS_DEV){
+ addEventListener('keydown',e=>{if(e.key==='r'||e.key==='R')river()});
+ addEventListener('keydown',e=>{if(e.key==='b'||e.key==='B')gorge()});
+}
 

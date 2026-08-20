@@ -1,5 +1,17 @@
 /* DOM references, timers, audio, and small helpers. */
 
+/* Is this a development run? Everything that must not reach a six-year-old hangs
+   off this: the layout editor, and the keys that jump straight to a hurdle.
+
+   A QA pass found B, R and E all live in the shipped build -- press B mid-story and
+   the player is teleported to the broken bridge. The conditions below are exactly
+   how this game gets run while it is being built (opened as a file, or served on
+   localhost), so nothing about the workflow changes; `?dev` is there for testing the
+   deployed copy. On the deployed site none of them hold and the dev surfaces are not
+   built at all. */
+const IS_DEV = location.protocol === 'file:'
+         || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+         || /[?&]dev(&|=|$)/.test(location.search);
 
 const $=s=>document.querySelector(s),F=$('#frame'),BG=$('#bg'),BG2=$('#bg2'),FX=$('#fx'),AIR=$('#air'),STAGE=$('#stage');
 
