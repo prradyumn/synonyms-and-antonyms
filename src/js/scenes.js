@@ -57,15 +57,31 @@ function pxBuild(f0,o){
      horizontal streaks, and a horizontal line scrolling sideways shows no movement
      at all, which is why the river read as still however fast it drifted. */
   const bg=m.paint||('url('+A[m.key]+')');
-  const css=m.strip
-   ? (m.edge||'bottom')+':0;height:'+Math.round(m.strip)+'px;'
-     +'background-repeat:repeat;background-image:'+bg
-   : 'top:0;height:100%;background-repeat:no-repeat;background-size:100% 100%;'
-     +'background-image:'+bg;
+  const box=m.strip
+   ? (m.edge||'bottom')+':0;height:'+Math.round(m.strip)+'px'
+   : 'top:0;height:100%';
+  const paint=m.strip
+   ? 'background-repeat:repeat;background-image:'+bg
+   : 'background-repeat:no-repeat;background-size:100% 100%;background-image:'+bg;
   const fx=m.fx?';filter:url(#'+m.fx+')':(m.dim?';filter:saturate(.86) brightness(.95)':'');
-  const el=layer((m.front?'pxf':'pxb')+(m.swell?' wave':''),m.z||1,
-   css+fx+(m.op?';opacity:'+m.op:''));
-  rig.push({el:el,rate:m.rate,wide:m.wide,tile:m.strip?1:0,strip:m.strip,
+  /* A DRIFTING layer gets an inner texture div, and the drift is a transform on
+     THAT, not a background-position on the layer itself. background-position is a
+     paint property: every step repainted a full-frame div and, on three of these,
+     re-ran an SVG filter over it. Measured, raising the drift rates alone cost 4fps
+     purely because the rounded offset then changed twice as often -- the paint was
+     always the cost, the speed just stopped hiding it. A transform on a
+     will-change'd child is a compositor move, so the filtered result is reused.
+     The swell animates background-position-y, so `wave` follows the background. */
+  const wrap=layer((m.front?'pxf':'pxb')+((m.swell&&!m.drift)?' wave':''),m.z||1,
+   box+(m.drift?'':';'+paint+fx)+(m.op?';opacity:'+m.op:''));
+  let tex=null;
+  if(m.drift){
+   tex=el('<div class="tex'+(m.swell?' wave':'')+'"></div>');
+   tex.style.cssText='position:absolute;left:0;top:0;height:100%;'+paint+fx
+    +';will-change:transform';
+   wrap.appendChild(tex);
+  }
+  rig.push({el:wrap,tex:tex,rate:m.rate,wide:m.wide,tile:m.strip?1:0,strip:m.strip,
             drift:m.drift||0,paint:!!m.paint});
  });
  const act=layer('pxb',2,'top:0;height:100%');
@@ -97,11 +113,15 @@ function pxBuild(f0,o){
   const u=Fw/1920;
   rig.span=Fw*(segs.length-1)-lapAll*u;   /* total camera travel, in px */
   rig.forEach(o=>{
+   const t=o.tex||o.el;                  /* the box scales; the texture paints */
    if(o.tile){
-    o.el.style.width=(Fw*4)+'px';
-    if(!o.paint)o.el.style.backgroundSize=(Fw*2)+'px 100%';
+    o.el.style.width=(Fw*4)+'px';if(o.tex)o.tex.style.width=(Fw*4)+'px';
+    if(!o.paint)t.style.backgroundSize=(Fw*2)+'px 100%';
     if(o.strip)o.el.style.height=Math.round(Fw*o.strip/1920)+'px';
-   } else o.el.style.width=(Fw*(o.wide||segs.length)-(o.wide?0:lapAll*u))+'px';
+   } else {
+    const w=(Fw*(o.wide||segs.length)-(o.wide?0:lapAll*u))+'px';
+    o.el.style.width=w;if(o.tex)o.tex.style.width=w;
+   }
   });
   /* 1px wider than a frame so neighbours overlap rather than risk a hairline gap */
   plates.forEach((g,i)=>{
@@ -114,12 +134,13 @@ function pxBuild(f0,o){
  /* Drift moves the TEXTURE inside a repeating layer rather than the layer itself,
     so a river still flows while the camera is parked. Wrapped at the tile width so
     it never runs away over a long scene. */
+ const dx=(o,Fw)=>'translateX('+(-(VT*o.drift)%(Fw*2)).toFixed(1)+'px)';
  rig.setF=f=>{rig.f=f;const Fw=Math.round(F.clientWidth);rig.forEach(o=>{
   o.el.style.transform='translateX('+Math.round(-f*rig.span*o.rate)+'px)';
-  if(o.drift)o.el.style.backgroundPositionX=Math.round(-(VT*o.drift)%(Fw*2))+'px';
+  if(o.drift)o.tex.style.transform=dx(o,Fw);
  })};
  rig.flow=()=>{const Fw=Math.round(F.clientWidth);rig.forEach(o=>{
-  if(o.drift)o.el.style.backgroundPositionX=Math.round(-(VT*o.drift)%(Fw*2))+'px'})};
+  if(o.drift)o.tex.style.transform=dx(o,Fw)})};
  rig.layout();
  window.__rig=rig;      /* test hook: step the camera by hand */
  return rig;

@@ -89,14 +89,16 @@ const RAFT={
     `drift` scrolls each texture on its own, so the river flows while he is parked.
     The near band moves nearly 3x the far one: measured, at the first values only 0.4%
     of the water's pixels changed over a second, because water_near is deliberately
-    sparse at 5% coverage and a slow scroll of a sparse texture reads as still. */
- mids:[{key:'water_far',  rate:0.62,z:1,strip:1080,edge:'bottom',drift:0.016,fx:'rippleFar'},
-       {key:'water_near', rate:1.22,z:6,strip:340, edge:'bottom',drift:0.042,front:1,fx:'ripple',swell:1},
+    sparse at 5% coverage and a slow scroll of a sparse texture reads as still.
+    Speeds raised again on request -- the RATIOS are what matter and they are held,
+    since the near-to-far differential is the depth cue, not the absolute rate. */
+ mids:[{key:'water_far',  rate:0.62,z:1,strip:1080,edge:'bottom',drift:0.030,fx:'rippleFar'},
+       {key:'water_near', rate:1.22,z:6,strip:340, edge:'bottom',drift:0.078,front:1,fx:'ripple',swell:1},
        /* A SECOND pass of the near band at a different rate and drift. water_near is
           deliberately sparse -- 5% coverage -- so one copy scrolling reads as almost
           still; two crossing at different speeds interfere and the surface comes
           alive without any new art. */
-       {key:'water_near', rate:0.96,z:5,strip:300, edge:'bottom',drift:0.024,op:0.75},
+       {key:'water_near', rate:0.96,z:5,strip:300, edge:'bottom',drift:0.045,op:0.75},
        /* Sheen: highlight streaks drawn in CSS, no asset.
 
           The angle is the GRADIENT's direction, not the stripes'. 98deg ran the
@@ -105,7 +107,7 @@ const RAFT={
           near-horizontal as water lines do, tilted just enough that the horizontal
           drift shifts them visibly -- a line 6 degrees off level moving sideways
           reads as moving down the river. The ripple filter then bends them. */
-       {rate:1.10,z:5,strip:300,edge:'bottom',drift:0.055,fx:'rippleStatic',swell:1,op:0.42,
+       {rate:1.10,z:5,strip:300,edge:'bottom',drift:0.104,fx:'rippleStatic',swell:1,op:0.42,
         paint:"repeating-linear-gradient(6deg,"
              +"rgba(255,255,255,0) 0 22px,rgba(255,255,255,.26) 22px 26px,"
              +"rgba(255,255,255,0) 26px 54px,rgba(214,244,255,.16) 54px 57px,"
