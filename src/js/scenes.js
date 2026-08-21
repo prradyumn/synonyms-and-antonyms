@@ -107,6 +107,11 @@ function pxBuild(f0,o){
  front.forEach(([k,rate,edge,h])=>rig.push({el:layer('pxf',6,
   edge+':0;background-image:url('+A[k]+')'),rate:rate,tile:1,strip:h}));
  rig.act=act;rig.segs=plates;rig.n=segs.length;rig.f=f0||0;
+ /* Props placed by WORLD FRACTION rather than parented to a segment. This is what a
+    tileable ground needs: with no painted plates there is no segment to hang a prop
+    on, so each one records where it belongs in the world and layout() re-places it
+    from the live frame size, exactly as every other length in the game is derived. */
+ rig.props=[];
 
  rig.layout=()=>{
   const Fw=Math.round(F.clientWidth);
@@ -129,6 +134,13 @@ function pxBuild(f0,o){
   joins.forEach((t,i)=>{
    const tw=Math.round(Fw*230/1920);
    t.style.left=((i+1)*Fw-tw/2)+'px';t.style.width=tw+'px'});
+  const actW=Fw*(segs.length||1)-lapAll*u;
+  rig.props.forEach(p=>{
+   const w=Fw*p.w/1920,h=F.clientHeight*p.h/1080;
+   p.el.style.width=Math.round(w)+'px';p.el.style.height=Math.round(h)+'px';
+   p.el.style.left=Math.round(p.wf*actW-w/2)+'px';
+   p.el.style.top=Math.round(F.clientHeight*p.y/100-h)+'px';
+  });
   rig.setF(rig.f);
  };
  /* Drift moves the TEXTURE inside a repeating layer rather than the layer itself,
@@ -387,6 +399,31 @@ function rampSurface(u){
 /* A ramp in the act layer, so it scrolls with the world. Its box IS the ramp:
    bottom edge on the surface below, top edge the crest. Returns the geometry the
    rider needs to walk its profile. */
+/* Put a prop on the action plane at a WORLD FRACTION -- 0 is the far left of the
+   world, 1 the far right -- with its BOTTOM at y% of frame height and its size in
+   design units. Both dimensions are explicit rather than derived from the image,
+   because everything else in this game is a measured number and a prop whose height
+   depends on when its file happens to decode is not measurable.
+
+   This is the other half of a tileable ground. The terrain repeats and therefore never
+   joins; everything unique -- a gap, a log, a mud patch, a stone -- comes through here
+   and sits exactly where the level data says. `putRamp` has been doing this for ramps
+   since the opening, on top of a plate; this generalises it and drops the plate. */
+function putProp(rig,key,wf,y,w,h,z){
+ const im=el('<img class="prop" src="'+A[key]+'">');
+ im.style.cssText='position:absolute;z-index:'+(z===undefined?3:z);
+ im.dataset.name=key;                       /* so the layout editor can label it */
+ rig.act.appendChild(im);
+ const p={el:im,wf:wf,y:y,w:w,h:h};
+ rig.props.push(p);
+ const Fw=F.clientWidth,Fh=F.clientHeight;
+ const actW=Fw*(rig.n||1);
+ im.style.width=Math.round(Fw*w/1920)+'px';im.style.height=Math.round(Fh*h/1080)+'px';
+ im.style.left=Math.round(wf*actW-Fw*w/1920/2)+'px';
+ im.style.top=Math.round(Fh*y/100-Fh*h/1080)+'px';
+ return p;
+}
+
 function putRamp(rig,tipCam,crestY,rise,behind){
  const Fw=F.clientWidth,Fh=F.clientHeight;
  const rh=rise/100*Fh,rw=Math.round(rh*RAMP_AR*RAMP_STRETCH);
@@ -821,13 +858,10 @@ function river(){
    J.place(RAFT.stop-f*200,yAt(RAFT.shore,RAFT.stop/100));
   });
   const card=()=>later(()=>{
-   /* Hurdle two hands on to hurdle three. Every scene until this one was reachable
-      only by a dev key, so playing normally you never saw it -- which is how the river
-      stayed invisible to every test that jumped straight to it. */
    F.appendChild(el('<div class="over card ask"><h3>The River</h3>'
     +'<p>The word game goes here.<br>Two logs that mean the same make one raft.</p>'
-    +'<button class="btn">On to the muddy path</button></div>'));
-   F.querySelector('.btn').onclick=()=>mud();
+    +'<button class="btn">Back to the start</button></div>'));
+   F.querySelector('.btn').onclick=()=>title();
   },600);
   later(()=>sayWith(J,RIVER.see,null,()=>{
    pan();                                    /* the pan runs UNDER the next line */
@@ -835,94 +869,82 @@ function river(){
   }),300);
  });
 }
-/* ---------- the muddy path ----------
-   Hurdle three, and the last. He rides down the path and it turns to mud.
+/* ---------- tileable-ground reference scene  (DEV ONLY, press T) ----------
+   The pattern the next location should be built on, and a live proof that it works.
 
-   The plate stack is the hook's, plus one thing: mud_near at 1.18, a low strip whose
-   near lip passes IN FRONT of his wheels. That occlusion is the scene. A wheel resting
-   on a painting of mud is a sticker; a wheel with the mud's own edge crossing it is in
-   the mud. It is the same lever as the contact shadow that fixed the floating bicycle,
-   and the one water_near was supposed to give the raft and did not, because its paint
-   sat at the bottom of its own canvas instead of at the waterline.
+   THE ACTION PLANE HAS NO PAINTED PLATES. `segs` is three EMPTY entries, which exist
+   only to give the camera two frames of travel and the props a coordinate space; the
+   ground comes from one tileable strip at rate 1.00, and everything unique is a prop
+   placed by world fraction.
 
-   Ground comes from MUD.prof, measured off the built plates by colour from BELOW. The
-   tyres bed in by MUD.drop, which is 11% of his height rather than the 5% used on
-   planks, because mud is soft. Between the two he sits IN the surface with no new
-   sprite -- there is no sunken-bicycle art and none is needed.
+   Why, in numbers. Every join problem this project has had was on the action plane and
+   none was ever on a tileable layer: the eight tileable layers differ by 0.00-1.30 at
+   their wrap, while the six act-plane butt joins differ by 13.3, 25.2, 27.8, 28.0,
+   45.2 and 78.0. laps[240,200], the join trunks, `nojoin`, taper_shore() and the whole
+   muddy path were one root cause -- discrete plates that have to meet. ground_path
+   measures 0.24 at its wrap, and every column of it is identical, so it is seamless by
+   construction rather than by luck.
 
-   The mechanic is not here yet: he arrives, sees the mud, and hands on to a card. */
-function mud(){
- clean();window.__scene='mud';
- const rig=pxBuild(0,{segs:MUD.seg,mids:MUD.mids,back:MUD.back,front:MUD.front,
-                      laps:MUD.laps,nojoin:MUD.nojoin});
+   What this also retires, for any scene built this way:
+     GORGE.prof's 103 hand-measured samples  -> one declared number, GROUND_T
+     ride_top() / band_top() ground detection -> nothing to detect
+     taper_shore()                            -> the land ends where a prop ends
+     a new 1920 plate to lengthen the world   -> one entry in `segs`
+     3 x ~100KB plates per location           -> one 9.6KB strip
+
+   The discipline it demands: keep the ground PLAIN. A tileable strip repeats every two
+   frames, so anything distinctive in it recurs -- which is why build_ground() takes the
+   per-row median of its source and throws the pebbles away. Character belongs in props,
+   which is less to draw, not more. */
+const GROUND_T = 76.0;        /* the walkable surface, printed by build_ground() */
+
+function tiled(){
+ clean();window.__scene='tiled';
+ const rig=pxBuild(0,{
+  /* three EMPTY segments: no art, just two frames of travel and a coordinate space */
+  segs:['','',''],
+  nojoin:1,
+  mids:[{key:'ground',rate:1.00,z:2,strip:400,edge:'bottom'}],
+  back:[['far_sky',0.20],['mid_canopy',0.50]],
+  front:[['near_leaves',1.40,'top',169],['near_grass',1.40,'bottom',236]]
+ });
+ /* Everything unique, at a world fraction. No plate carries any of it, so none of it
+    can land on a join -- there are no joins. */
+ /* World fractions, and the arithmetic is worth writing down because it caught me
+    out: `wf` spans the whole action plane, which is 3 frames here, while the camera
+    travels 2. So at the end of the ride the frame shows fractions 0.667 to 1.0, and a
+    prop meant to be at x% of the frame then belongs at (2 + x/100) / 3. Placing them
+    at 0.30-0.62 by eye left every one of them behind him. */
+ const at=x=>(2+x/100)/3;                    /* frame % when parked -> world fraction */
+ putProp(rig,'log_a',at(30),GROUND_T+1.5,190,74);
+ putProp(rig,'log_b',at(50),GROUND_T+1.5,190,74);
+ putProp(rig,'log_c',at(70),GROUND_T+1.5,190,74);
+ putProp(rig,'plank',at(-40),GROUND_T+1.0,240,40);   /* scenery he passes on the way */
+
  const J=mkActor(RIDER,'cyc',1);J.w.dataset.name='jhumru';
  RELAY=()=>{rig.layout();J.layout()};
 
- /* The same world arithmetic as the gorge: plates OVERLAP, so a plate's world position
-    is not i*1920, and the later plate is drawn on top -- where two profiles cover the
-    same world x, the later one is the surface he actually rides. Built in order, later
-    points overwriting earlier ones. */
- const n=MUD.seg.length,laps=MUD.laps;
- const lapTo=i=>laps.slice(0,i).reduce((a,b)=>a+b,0);
- const worldW=1920*n-lapTo(n);
- const track=[];
- MUD.prof.forEach((pr,i)=>{
-  const left=i*1920-lapTo(i);
-  pr.forEach((y,j)=>{
-   const f=(left+j*1920/(pr.length-1))/worldW;
-   while(track.length&&track[track.length-1][0]>=f-1e-9)track.pop();
-   track.push([f,y]);
+ /* One declared ground height for the whole world. There is no profile to measure
+    because there is no unique terrain to measure -- which is the point. */
+ const drop=5*RIDER.still.hu/1080;
+ const y=GROUND_T+drop;
+
+ J.place(-12,y);
+ J.riding(1);
+ tween(RIDE_IN*1.2,p=>J.place(-12+(HOLD_X+12)*easeRide(p),y),()=>{
+  tween(LEG*2.2,p=>{rig.setF(easeOut(p));J.place(HOLD_X,y)},()=>{
+   J.show('still');J.riding(0);tone(430,.12);
+   later(()=>sayWith(J,[{who:'nar',line:'One tileable ground, four props, and not a '
+     +'single plate join anywhere in this world.',face:'proud'}],null,()=>{
+    later(()=>{
+     F.appendChild(el('<div class="over card"><h3>Tileable ground</h3>'
+      +'<p>No plates on the action plane.<br>The terrain repeats; the props are placed.</p>'
+      +'<button class="btn">Back to the start</button></div>'));
+     F.querySelector('.btn').onclick=()=>title();
+    },600);
+   }),500);
   });
  });
- const travel=1920*(n-1)-lapTo(n);
- const worldAt=f=>(f*travel+HOLD_X/100*1920)/worldW;
- const drop=(MUD.drop||0)*RIDER.still.hu/1080;
- const yOf=f=>yAt(track,worldAt(f))+drop;
-
- /* Stop short of the mud's near edge, which is measured off plate 2's alpha rather
-    than guessed. MUD.stop is a camera fraction. */
- /* One plate means no camera travel, so the whole arrival is him crossing the frame:
-    a long ride from off-screen left to MUD.hold, which is just short of the mud's near
-    edge. Slower than the usual entry, because it is carrying the motion the camera
-    would otherwise provide. */
- const HOLD=MUD.hold===undefined?HOLD_X:MUD.hold;
- const stopF=Math.min(1,MUD.stop||0);
-
- J.place(-12,yOf(0));
- let armed=1;
- const RIDE=RIDE_IN*2.4,RUN=LEG*1.9;
-
- tween(RIDE,p=>{
-  const x=-12+(HOLD+12)*easeRide(p);
-  J.place(x,yOf(0));
- },()=>{
-  if(stopF<=0){arrive();return}
-  J.riding(1);J.show('cyc');
-  tween(RUN,p=>{
-   const f=stopF*easeOut(p);
-   rig.setF(f);J.place(HOLD,yOf(f));
-  },arrive);
- });
-
- function arrive(){
-   J.show('still');J.riding(0);tone(430,.12);
-   /* In on the mud, as the gorge does on the gap: this is the obstacle and it has to
-      become the subject before any words arrive. Released before the card, so the
-      hand-over starts from a neutral frame rather than mid-move. */
-   const GFX={};
-   const beat=(lines,next,wait)=>later(()=>sayWith(J,lines,GFX,next),wait||0);
-   const tryIt =()=>beat(MUDTALK.try,turn,400);
-   const turn  =()=>{camTo(1,700);beat(MUDTALK.turn,handOn,300)};
-   const handOn=()=>later(()=>{
-    if(!armed)return;armed=0;
-    F.appendChild(el('<div class="over card"><h3>The Muddy Path</h3>'
-     +'<p>The word game goes here.<br>Two stones that mean the same make one footing.</p>'
-     +'<button class="btn">Back to the start</button></div>'));
-    F.querySelector('.btn').onclick=()=>title();
-   },700);
-   later(()=>camTo(1.15,900,54,70),300);
-   beat(MUDTALK.see,tryIt,700);
- }
  fon('pointerdown',()=>{});
 }
 
@@ -932,6 +954,7 @@ function mud(){
 if(IS_DEV){
  addEventListener('keydown',e=>{if(e.key==='r'||e.key==='R')river()});
  addEventListener('keydown',e=>{if(e.key==='b'||e.key==='B')gorge()});
- addEventListener('keydown',e=>{if(e.key==='m'||e.key==='M')mud()});
+ /* T for the tileable-ground reference scene -- the pattern for new locations */
+ addEventListener('keydown',e=>{if(e.key==='t'||e.key==='T')tiled()});
 }
 

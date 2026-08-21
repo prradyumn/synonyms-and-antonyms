@@ -980,7 +980,7 @@ def main():
     build_ramp()
     build_bubble()
     build_font()
-    build_mud()
+    build_ground()
     for key, (fn, h, dur) in LOOPS.items():
         p = CH / fn
         if not p.exists():
@@ -1073,304 +1073,115 @@ def build_font():
 
 
 # ---------------------------------------------------------------------------
-# The muddy path -- hurdle three
+# A TILEABLE ground for the action plane
 # ---------------------------------------------------------------------------
-MUD_SRC    = 'muddy_path_assets/muddy_path_assets'
-# TWO plates, not three. act_mud_deep is dropped, and this is measured rather than a
-# preference: comparing what sits just before each candidate join with what follows it,
-# near -> far scores 3.78 while near -> deep scores 26.13 and deep -> far 26.55. For
-# scale, the natural variation WITHIN a single plate 260 columns along is 7.98 (near)
-# and 12.26 (far). So near -> far is smoother than either plate is with itself, and the
-# other two joins are seven times worse.
+# Every join problem this project has had was on the action plane, and none was ever on
+# a tileable layer. Measured: the eight tileable layers differ by 0.00-1.30 at their
+# wrap, one outlier at 9.4; the six act-plane butt joins differ by 13.3, 25.2, 27.8,
+# 28.0, 45.2 and 78.0. Forty times worse, every time. laps[240,200], the join trunks,
+# nojoin, taper_shore() and the whole muddy-path saga were all the same root cause:
+# discrete plates that have to meet.
 #
-# The overlap band being pixel-identical makes a seam invisible, which it did -- but it
-# cannot make plate 2's content flow out of plate 1's, and plate 2 diverged the moment
-# its copied band ended. That was the visible defect, and no amount of blending fixed
-# it. Plate 1 carries the mud, which is where he stops, so nothing is lost.
-MUD_PLATES = [('act_mud_near.png', 'act_mud_near.webp'),
-              ('act_mud_far.png',  'act_mud_far.webp')]
-MUD_LAP    = 260      # design units of overlap per join, per docs/18
-MUD_TARGET = 72.0     # where plate 1's surface must land: act_raft_far's path height
-MUD_FLOOR  = 88.0     # ground continues down to here. near_grass is opaque from
-                      # 82.9%, and mid_canopy paints all the way to 100%, so a
-                      # floor at the spec's 82% left a sliver of distant treeline
-                      # showing THROUGH the path. Overlap the fringe instead.
-MUD_BLEND  = 400      # columns over which a ledge at the overlap boundary is eased out
+# The action plane welds two different things together -- TERRAIN, which is repetitive
+# and could tile forever, and FEATURES (a gap at 47.9%, three logs, a mud patch), which
+# are unique and belong at specific world positions. Because they share one image the
+# image must be unique, which forces plates, which forces joins. Split them and there
+# is nothing left to join.
+#
+# This builds the terrain half. The source is the one genuinely good thing in the
+# deleted muddy-path pack: a 266px window of pure path with the surface varying by
+# 0.3px and the band bottom by 0.0px. It is distilled to a per-row MEDIAN colour, which
+# throws away the pebbles -- deliberately, because a tileable ground must be plain or
+# its landmarks recur. Character goes in props, which is cheaper to draw anyway. Every
+# column of the result is identical, so the wrap difference is exactly zero by
+# construction rather than by luck.
+GROUND_SRC  = 'muddy_path_assets/muddy_path_assets/act_mud_near.png'
+GROUND_WIN  = (1654, 1920)   # the pure-path window: no greenery, no mud
+GROUND_H    = 400            # strip height in design units, bottom-pinned
+GROUND_SURF = 76.0           # where the walkable surface lands, % of frame height
+GROUND_W    = 3840           # twice the frame, the project's tiling convention
 
 
-def _mud_surface(a):
-    """The path surface and the band's lowest row, per column, found by walking UP from
-    the lowest warm pixel.
-
-    Colour from ABOVE finds trunk bark and greenery -- that is how the rider came to
-    float 83px on the bridge approach. From below it can only find the ground he
-    actually stands on."""
-    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
-    warm = (al > 128) & (r > 100) & (r > b + 30) & (g < r)
-    H, W = al.shape
-    top = np.full(W, -1)
-    bot = np.full(W, -1)
-    for x in range(W):
-        c = np.where(warm[:, x])[0]
-        if not len(c):
-            continue
-        bot[x] = c.max()
-        y = c.max()
-        while y - 1 >= 0 and warm[y - 1, x]:
-            y -= 1
-        top[x] = y
-    return top, bot
-
-
-def _mud_greenery(plates, lap):
-    """Carry the near greenery across the bald stretches, and restore the overlap
-    identity afterwards.
-
-    This is a flaw in the BRIEF, not the delivery. docs/18 said the 260-unit end bands
-    must hold no distinctive object, so the join could not show half a bush twice. The
-    artist obeyed exactly -- and then also stopped the background greenery, leaving
-    plate 1 bald for its last 1147 columns and plate 2's own greenery starting as a wall
-    at the far end of the copied band. The rule should have said: no distinctive object,
-    but the greenery behind the path continues.
-
-    So the greenery is carried across here, sampled from plate 2's own band and aligned
-    to each destination column's ground surface, mirrored on each repeat so it does not
-    read as a tiled hedge. It is written to plate 1's right band and plate 2's left band
-    from the SAME generated pixels, so the two stay byte-identical and the join is still
-    invisible by construction."""
-    GH = 230                                    # how much of the band above the surface
-    tops = [_mud_surface(a)[0] for a in plates]
-
-    def bald(a):
-        r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
-        cols = ((al > 128) & (g > r + 15) & (g > 90)).any(0)
-        out, s = [], None
-        for x in range(len(cols)):
-            if not cols[x] and s is None:
-                s = x
-            elif cols[x] and s is not None:
-                if x - s > 60:
-                    out.append((s, x - 1))
-                s = None
-        if s is not None and len(cols) - s > 60:
-            out.append((s, len(cols) - 1))
-        return out
-
-    # The donor: whichever plate has the most greenery, sampled from a stretch of it
-    # that really has bushes. It was plate 2 until plate 2 was dropped.
-    green = [((a[..., 3] > 128) & (a[..., 1] > a[..., 0] + 15)).sum() for a in plates]
-    di = int(np.argmax(green))
-    src = plates[di]
-    stop = tops[di]
-    cols = ((src[..., 3] > 128) & (src[..., 1] > src[..., 0] + 15)).any(0)
-    donor = [x for x in range(len(cols)) if cols[x] and stop[x] >= 0]
-    donor = donor[len(donor) // 6: len(donor) // 6 + 420] or donor
-
-    def paint(dst, di, x0, x1):
-        """Copy greenery into dst columns x0..x1, aligned to each column's surface."""
-        dtop = tops[di]
-        n = len(donor)
-        for k, x in enumerate(range(x0, x1 + 1)):
-            if dtop[x] < 0:
-                continue
-            j = k % (2 * n)
-            sx = donor[j] if j < n else donor[2 * n - 1 - j]   # mirror on every repeat
-            sy, dy = stop[sx], dtop[x]
-            for row in range(1, GH + 1):
-                ys, yd = sy - row, dy - row
-                if ys < 0 or yd < 0:
-                    break
-                if src[ys, sx, 3] > 128 and dst[yd, x, 3] < 128:
-                    dst[yd, x] = src[ys, sx]
-
-    for i, a in enumerate(plates):
-        for x0, x1 in bald(a):
-            if i > 0 and x0 == 0:
-                continue                        # a copied band; restored below
-            paint(a, i, x0, x1)
-
-    # restore the overlap identity: whatever plate 1 now has in its right band IS the
-    # band, so copy it verbatim into plate 2's left band, and likewise 2 -> 3
-    W = plates[0].shape[1]
-    for i in range(1, len(plates)):
-        plates[i][:, :lap] = plates[i - 1][:, W - lap:]
-    return plates
-
-
-def build_mud():
-    """Three act plates for the muddy path, corrected into the game's coordinate space.
-
-    The delivery got right everything docs/18 made a hard rule, which is the point of
-    having written that table: overlap bands pixel-identical (mean difference 0.00
-    against a control of 10.9), no padding and no matte, hard alpha at the world edges,
-    mud_near tiles and its paint is inside the specified row window, and the three stone
-    silhouettes are byte-identical.
-
-    Two things need correcting here and both come from one misreading. "Everything below
-    82% of image height must be fully transparent" was read as "stop the ground", so each
-    plate's ground is a thin floating strip -- hard cut top AND bottom, sky behind it --
-    and the whole scene sits about 28.6% too high, path surface at 43.4% rather than
-    72.0%. So:
-
-      1. De-step. Plates 2 and 3 carry the copied overlap band at the neighbour's height
-         and then their own ground at a different one, leaving a hard 41px and 52px ledge
-         at exactly x=259 where the copied band ends. The overlap itself is perfect; the
-         step just moved 260px inboard. Each is eased out over 400 columns starting from
-         zero AT the boundary, so the band stays pixel-identical with its neighbour. The
-         band there is featureless ochre, so a vertical slide cannot be seen.
-      2. Give the ground a body: fill from each column's band bottom down to 82% with
-         that column's own colour, so it reads as ground rather than a strip in mid-air.
-      3. Shift. ONE offset for all three plates, so the overlap bands stay aligned.
-      4. Extend the edge trunks back up to the top of the frame, since the shift moved
-         their tops down. Bark is a vertical texture and mirror-tiles invisibly.
-
-    Prints the resulting walkable profile for MUD.prof in levels.js."""
-    src = ROOT / MUD_SRC
-    if not (src / MUD_PLATES[0][0]).exists():
-        print('skip mud (no pack)')
+def build_ground():
+    """One tileable ground strip for the action plane, and the numbers a scene needs."""
+    p = ROOT / GROUND_SRC
+    if not p.exists():
+        print('skip ground (no source plate)')
         return
+    a = np.array(Image.open(p).convert('RGBA')).astype(int)
+    H = a.shape[0]
+    x0, x1 = GROUND_WIN
+    win = a[:, x0:x1]
+    r, g, b, al = win[..., 0], win[..., 1], win[..., 2], win[..., 3]
+    warm = (al > 128) & (r > 100) & (r > b + 30) & (g < r)
 
-    plates = [np.array(Image.open(src / a).convert('RGBA')).astype(int)
-              for a, _ in MUD_PLATES]
-    H, W = plates[0].shape[:2]
-    lap = round(MUD_LAP * W / 1920)
+    # the band, found by walking UP from the lowest warm pixel -- from above, colour
+    # finds trunk bark and greenery, which is how a rider once floated 83px
+    col = np.where(warm[:, 0])[0]
+    bot = int(col.max())
+    top = bot
+    while top - 1 >= 0 and warm[top - 1, 0]:
+        top -= 1
 
-    # ---- 1. de-step, plates 2 and 3 -----------------------------------------
-    for i in range(1, len(plates)):
-        a = plates[i]
-        top, _ = _mud_surface(a)
-        step = int(top[lap] - top[lap - 1])      # + means its own ground sits lower
-        if abs(step) < 4:
-            print('       ' + MUD_PLATES[i][0] + ': no ledge at the overlap boundary')
-            continue
-        out = a.copy()
-        for j in range(MUD_BLEND):
-            x = lap + j
-            if x >= W:
-                break
-            t = (j + 1) / MUD_BLEND
-            ease = 1 - (1 - t) ** 2              # 0 at the boundary, 1 by the end
-            dy = int(round(-step * (1 - ease)))
-            if dy:
-                out[:, x] = np.roll(a[:, x], dy, axis=0)
-        plates[i] = out
-        print('       %s: %+dpx ledge at x=%d eased over %d columns'
-              % (MUD_PLATES[i][0], -step, lap, MUD_BLEND))
+    # per-row median across the window: the path's real vertical tonal structure with
+    # the pebbles averaged out
+    prof = np.zeros((bot - top + 1, 4))
+    for i, y in enumerate(range(top, bot + 1)):
+        px = win[y][warm[y]]
+        prof[i] = np.median(px, axis=0) if len(px) else [0, 0, 0, 0]
+    prof[:, 3] = 255
 
-    # ---- 1b. carry the greenery across the bald stretches -------------------
-    before = [((a[..., 3] > 128) & (a[..., 1] > a[..., 0] + 15)).sum() for a in plates]
-    plates = _mud_greenery(plates, lap)
-    after = [((a[..., 3] > 128) & (a[..., 1] > a[..., 0] + 15)).sum() for a in plates]
-    print('       greenery carried across: %s -> %s px'
-          % (str([int(x) for x in before]), str([int(x) for x in after])))
+    surf_row = int(round((GROUND_SURF / 100 * 1080) - (1080 - GROUND_H)))
+    depth = GROUND_H - surf_row
+    if depth < 2 or surf_row < 0:
+        print('skip ground (surface does not fit the strip)')
+        return
+    # stretch the profile over the full depth. Nearest-neighbour: the profile is a soft
+    # gradient, and this keeps it from being smeared into bands.
+    idx = (np.arange(depth) * (len(prof) - 1) / (depth - 1)).round().astype(int)
+    strip = np.zeros((GROUND_H, GROUND_W, 4), int)
+    strip[surf_row:, :] = prof[idx][:, None, :]
 
-    # ---- 2 + 3. ground body, then shift into place --------------------------
-    top0, _ = _mud_surface(plates[0])
-    ref = float(np.median(top0[lap:]))           # plate 1's own surface, past its edge
-    shift = int(round(MUD_TARGET / 100 * H - ref))
-    floor = int(round(MUD_FLOOR / 100 * H))
-    print('       surface %.2f%% -> %.1f%%  (shift +%dpx), ground filled to %.0f%%'
-          % (100 * ref / H, MUD_TARGET, shift, MUD_FLOOR))
+    # Texture, with the wrap still exact. Identical columns tile perfectly but read as
+    # flat orange lino rather than dirt, so the ground needs grain -- and grain whose
+    # PERIOD DIVIDES THE TILE stays seamless by construction, which random noise would
+    # not. Two parts:
+    #   soft mottling from a few harmonics of the full width, so every period divides
+    #     3840 exactly and the wrap is mathematically closed;
+    #   fine grain from a 240px random block repeated 16 times -- invisible as a repeat
+    #     because there is no structure at that scale to recognise.
+    # This is the discipline the whole approach rests on, stated precisely: the ground
+    # may have TEXTURE but no LANDMARKS. Anything a child could point at recurs.
+    rng = np.random.default_rng(7)
+    yy = np.arange(depth)[:, None]
+    xx = np.arange(GROUND_W)[None, :]
+    mottle = np.zeros((depth, GROUND_W))
+    for k, amp in ((3, 3.4), (7, 2.3), (11, 1.7), (17, 1.2), (29, 0.8), (43, 0.6)):
+        ph = rng.uniform(0, 2 * np.pi)
+        vy = 0.6 + 0.4 * np.cos(yy * (k % 5 + 1) * np.pi / max(depth - 1, 1))
+        mottle += amp * vy * np.sin(2 * np.pi * k * xx / GROUND_W + ph)
+    TILE = 240                                  # 3840 / 240 = 16, exact
+    fine = rng.normal(0, 2.1, (depth, TILE))
+    fine = np.tile(fine, (1, GROUND_W // TILE))
+    tex = (mottle + fine)[:, :, None]
+    strip[surf_row:, :, :3] = (strip[surf_row:, :, :3] + tex).clip(0, 255)
 
-    for i, a in enumerate(plates):
-        top, bot = _mud_surface(a)
-        out = np.zeros_like(a)
-        out[shift:, :] = a[:H - shift, :]
-        # STRETCH the delivered band to fill the full depth, rather than filling
-        # below it. Three fills were tried first and all three looked wrong: a
-        # per-column average striped the body like a barcode; tiling the band's own
-        # rows downward repeated the mud ellipse as dark stripes; a smoothed average
-        # left 16% of the frame height as dead flat ochre with a hard top edge, which
-        # was the single ugliest thing on screen.
-        #
-        # Stretching has none of those problems and is also the more correct answer:
-        # ground seen nearly edge-on IS foreshortened, so scaling the band vertically
-        # is what makes it read as receding rather than as a wall. Every pebble, tonal
-        # shift and patch of mud in the delivered art survives, and there is no
-        # boundary anywhere because nothing is synthesised.
-        for x in range(W):
-            if bot[x] < 0 or top[x] < 0:
-                continue
-            y0, y1 = top[x] + shift, bot[x] + shift          # the band, once shifted
-            if y1 <= y0 or y0 >= floor:
-                continue
-            band = out[y0:y1 + 1, x].astype(float)   # NOT `src` -- that is the pack dir
-            h = floor - y0
-            if h < 2:
-                continue
-            # nearest-neighbour along the column: the band is a soft texture, and
-            # interpolating would smear the pebbles into vertical streaks
-            idx = (np.arange(h) * (len(band) - 1) / (h - 1)).round().astype(int)
-            out[y0:floor, x] = band[idx].round().astype(int)
+    dst = BG / 'ground_path.webp'
+    Image.fromarray(strip.astype(np.uint8), 'RGBA').save(dst, 'WEBP', quality=92, method=6)
 
-        # ---- 4. edge trunks back up to the top of the frame ------------------
-        had_top = a[0, :, 3] > 128               # only columns that carried a trunk
-        for x in np.where(had_top)[0]:
-            blk = out[shift:shift * 2, x]
-            if not len(blk):
-                continue
-            fill = np.concatenate([blk[::-1], blk])   # mirrored, so no hard repeat
-            reps = int(np.ceil(shift / len(fill))) + 1
-            out[:shift, x] = np.tile(fill, (reps, 1))[:shift]
-        plates[i] = out
-
-    # ---- save, and report the profile ---------------------------------------
-    total = 0
-    for (_, dst), a in zip(MUD_PLATES, plates):
-        p = BG / dst
-        Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA').save(
-            p, 'WEBP', quality=88, method=6)
-        total += p.stat().st_size
-        print('mud   %-20s (%d, %d) %.0fKB'
-              % (dst, a.shape[1], a.shape[0], p.stat().st_size / 1024))
-
-    world = len(plates) * W - (len(plates) - 1) * lap
-    line = np.full(world, np.nan)
-    for i, a in enumerate(plates):
-        top, _ = _mud_surface(a)
-        off = i * (W - lap)
-        for x in range(W):
-            if top[x] >= 0:
-                line[off + x] = 100 * top[x] / H          # a later plate wins
-    stepn = world // 32
-    # a local median over a wide window, so a trunk column at a world edge cannot
-    # define the ground -- it reported 86.8% once, which is the trunk, not the path
-    flat = [round(float(np.nanmedian(line[max(0, k - 60):k + 61])), 2)
-            for k in range(0, world, stepn)]
-    print('       RUNTIME  laps %s   world %.2f frames'
-          % (str([MUD_LAP] * (len(plates) - 1)), world / W))
-    print('       MUD.prof (%d samples, %.1f%%-%.1f%%):' % (len(flat), min(flat), max(flat)))
-    print('         ' + str(flat))
-
-    for a, dst in [('mud_near.png', BG / 'mud_near.webp'),
-                   ('stones_firm.png', CH / 'stones_firm.webp'),
-                   ('stones_sunk.png', CH / 'stones_sunk.webp'),
-                   ('fx_mud_splat.png', CH / 'fx_mud_splat.webp'),
-                   ('fx_mud_splat_b.png', CH / 'fx_mud_splat_b.webp')]:
-        p = src / a
-        if not p.exists():
-            print('       skip ' + a)
-            continue
-        im = Image.open(p).convert('RGBA')
-        im.save(dst, 'WEBP', quality=90, method=6)
-        total += dst.stat().st_size
-        print('mud   %-20s %s %.0fKB' % (dst.name, im.size, dst.stat().st_size / 1024))
-
-    # the stones already share one canvas; crop all three to ONE bbox so they cannot
-    # drift apart at runtime, exactly as build_wheelie and build_stills do
-    stones = [Image.open(src / ('prop_stone_%d.png' % i)).convert('RGBA') for i in (1, 2, 3)]
-    m = np.zeros(np.array(stones[0]).shape[:2], bool)
-    for s in stones:
-        m |= np.array(s)[..., 3] > 8
-    ys, xs = np.where(m)
-    box = (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
-    for i, s in enumerate(stones, 1):
-        d = CH / ('prop_stone_%d.webp' % i)
-        s.crop(box).save(d, 'WEBP', quality=90, method=6)
-        total += d.stat().st_size
-    bw, bh = box[2] - box[0], box[3] - box[1]
-    print('mud   prop_stone_1..3       (%d, %d) shared bbox   ar %.4f' % (bw, bh, bw / bh))
-    print('       total %.0fKB' % (total / 1024))
+    # prove the claim rather than asserting it
+    chk = np.array(Image.open(dst).convert('RGBA')).astype(int)
+    wrap = np.abs(chk[:, 0, :] - chk[:, -1, :]).mean()
+    inter = np.abs(chk[:, 100, :] - chk[:, 101, :]).mean()
+    print('ground %-20s (%d, %d) %.1fKB'
+          % (dst.name, GROUND_W, GROUND_H, dst.stat().st_size / 1024))
+    print('       source: %s cols %d-%d, band rows %d-%d (%dpx)'
+          % (os.path.basename(GROUND_SRC), x0, x1, top, bot, bot - top + 1))
+    print('       wrap difference %.4f, interior %.4f  -- seamless BY CONSTRUCTION'
+          % (wrap, inter))
+    print('       RUNTIME  {key:"ground",rate:1.00,z:2,strip:%d,edge:"bottom"}' % GROUND_H)
+    print('       walkable surface %.1f%% of frame (strip row %d of %d)'
+          % (GROUND_SURF, surf_row, GROUND_H))
 
 
 if __name__ == '__main__':

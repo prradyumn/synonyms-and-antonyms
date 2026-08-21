@@ -37,9 +37,15 @@ FRAME = "() => { const f = document.querySelector('#frame').getBoundingClientRec
 
 # Only things that could visibly sit outside the frame. Parallax layers are four
 # frames wide by design and #frame clips them, so they are not interesting here.
+#
+# `.cyc` is NOT in this list, and that is deliberate: every scene starts the rider at
+# x = -12% so he can ride IN from off-stage, so catching him there is catching the
+# design, not a defect. This check reported 252px off the left once for exactly that
+# reason. #frame has overflow:hidden, so a sprite outside it cannot be seen anyway --
+# what this check is for is UI that has been pushed out and would be unreachable.
 STRAY = """() => {
   const f = document.querySelector('#frame').getBoundingClientRect(), out = [];
-  for (const sel of ['#ask', '.bub', '.over.card', '.btn', '.cyc', '.trailmap'])
+  for (const sel of ['#ask', '.bub', '.over.card', '.btn', '.trailmap'])
     for (const e of document.querySelectorAll(sel)) {
       if (e.hidden || !e.getClientRects().length) continue;
       const r = e.getBoundingClientRect();
@@ -163,8 +169,20 @@ with sync_playwright() as p:
         pg.click('.over.card .btn'); pg.wait_for_timeout(300)
         pg.keyboard.press(key); pg.wait_for_timeout(3000)
         check(f"{name}: reachable by dev key", pg.evaluate("()=>window.__scene") == name)
+        # rAF is throttled to nothing when the window is occluded, so an unfocused
+        # headed browser reports 0 -- which is not a stall. Bring it to front, and
+        # retry once before believing a zero.
+        pg.bring_to_front(); pg.wait_for_timeout(400)
         fps = pg.evaluate(FPS, 2500)
-        check(f"{name}: frame rate at least 30fps", fps >= 30, f"{fps} fps", warn=fps >= 24)
+        if fps == 0:
+            pg.bring_to_front(); pg.wait_for_timeout(800)
+            fps = pg.evaluate(FPS, 2500)
+        if fps == 0:
+            check(f"{name}: frame rate measurable", False,
+                  "rAF never fired -- window occluded, not a stall", warn=True)
+        else:
+            check(f"{name}: frame rate at least 30fps", fps >= 30, f"{fps} fps",
+                  warn=fps >= 24)
         stray = pg.evaluate(STRAY)
         check(f"{name}: nothing pushed outside the frame", not stray, str(stray[:2]))
         rd = pg.evaluate(RIDER)

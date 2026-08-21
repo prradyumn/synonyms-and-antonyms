@@ -1,5 +1,13 @@
 # The Muddy Path — asset package
 
+> **STATUS: not in the game.** The pack this brief produced was built and integrated,
+> and then removed on 2026-08-21 because it still read as unnatural. What went wrong is
+> recorded in the joins section below, and it is the reason this document is worth
+> keeping: the plates were three separate drawings that shared a 260-unit strip, and no
+> amount of build-time work made one flow into the next. The corrected instruction is
+> the third join rule. `git show 63b7373` has the integration if it is ever wanted back;
+> the delivered art is in `muddy_path_assets/`.
+
 Hurdle three, the last one. Rain has turned a stretch of the jungle path to deep
 mud. The wheels sink; he cannot ride through. Something has to go down first.
 
